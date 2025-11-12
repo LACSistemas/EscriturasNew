@@ -1,0 +1,22 @@
+# FastAPI Dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+python-multipart==0.0.6
+
+# Async HTTP client (optional, for future enhancements)
+httpx==0.25.1
+aiofiles==23.2.1
+
+# Existing dependencies
+flask==3.0.0
+google-cloud-vision==3.4.5
+google-generativeai==0.3.1
+python-dotenv==1.0.0
+PyMuPDF==1.23.8
+
+# Session management
+itsdangerous==2.1.2
+
+# Database
+# (add your database dependencies here if needed)
