@@ -17,6 +17,7 @@ from routes.health_routes_fastapi import router as health_router
 from routes.auth_routes_fastapi import router as auth_router
 from routes.cartorio_routes_fastapi import router as cartorio_router
 from routes.process_routes_fastapi import router as process_router, set_clients
+from routes.process_routes_sm import router as process_sm_router
 
 # Force unbuffered output
 sys.stdout = sys.__stdout__
@@ -72,6 +73,7 @@ app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(cartorio_router)
 app.include_router(process_router)
+app.include_router(process_sm_router)  # New State Machine endpoint
 
 # Error handlers
 @app.exception_handler(404)
@@ -112,7 +114,8 @@ async def root():
             "Async/await for better performance",
             "Automatic API documentation",
             "Type validation with Pydantic",
-            "Modern Python async/await patterns"
+            "Modern Python async/await patterns",
+            "State Machine workflow architecture (POST /process/sm)"
         ]
     }
 
