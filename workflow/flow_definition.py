@@ -13,6 +13,34 @@ logger = logging.getLogger(__name__)
 # HELPER CALLBACKS
 # ============================================================================
 
+async def dispensar_certidao(session: Dict[str, Any], tipo: str, vendedor_specific: bool = False):
+    """Save certidão as dispensed (not presented)
+
+    Args:
+        session: Current session
+        tipo: Certificate type (e.g., "negativa_federal", "onus")
+        vendedor_specific: If True, append vendedor_index to key
+    """
+    from models.session import add_certidao_to_session, ensure_temp_data
+
+    # Get vendedor index if needed
+    vendedor_index = None
+    if vendedor_specific:
+        temp_data = ensure_temp_data(session)
+        vendedor_index = temp_data.get("current_vendedor_index", 0)
+
+    # Save as dispensed with minimal data
+    add_certidao_to_session(
+        session,
+        tipo=tipo,
+        data={},
+        vendedor_index=vendedor_index,
+        dispensada=True
+    )
+
+    logger.info(f"Certidão dispensada: {tipo}" + (f" (vendedor {vendedor_index})" if vendedor_specific else ""))
+
+
 async def finalize_comprador(session: Dict[str, Any]):
     """Finalize current comprador - move from temp_data to compradores list"""
     finalize_and_add_comprador(session)
@@ -46,6 +74,78 @@ async def finalize_vendedor(session: Dict[str, Any]):
     current_vendedor = session.get("vendedores", [])[-1] if session.get("vendedores") else None
     if current_vendedor:
         logger.info(f"Finalized vendedor: {current_vendedor.get('nome_completo', 'Unknown')}")
+
+
+# ============================================================================
+# DRY HELPER FOR CERTIDÃO OPTION WORKFLOW
+# ============================================================================
+
+def create_certidao_option_workflow(
+    machine: WorkflowStateMachine,
+    certidao_tipo: str,
+    certidao_display_name: str,
+    processor: callable,
+    next_step_after: str,
+    vendedor_specific: bool = False
+) -> str:
+    """DRY helper to create option workflow for certidões.
+
+    Creates two steps:
+    1. certidao_X_option - asks "Apresentar ou Dispensar?"
+    2. certidao_X_upload - file upload with processor (if "Apresentar")
+
+    Args:
+        machine: WorkflowStateMachine instance
+        certidao_tipo: Internal type name (e.g., "negativa_federal")
+        certidao_display_name: Display name (e.g., "Certidão Negativa Federal")
+        processor: Async function to process file
+        next_step_after: Step to go to after this certidão is done
+        vendedor_specific: If True, certidão is vendedor-specific
+
+    Returns:
+        Name of the option step (to use as entry point)
+    """
+    option_step_name = f"certidao_{certidao_tipo}_option"
+    upload_step_name = f"certidao_{certidao_tipo}_upload"
+
+    # Create callback for "Dispensar" option
+    async def on_dispensar(session):
+        await dispensar_certidao(session, certidao_tipo, vendedor_specific)
+
+    # STEP 1: Option question
+    machine.register_step(StepDefinition(
+        name=option_step_name,
+        step_type=StepType.QUESTION,
+        handler=CallbackQuestionHandler(
+            step_name=option_step_name,
+            question=f"{certidao_display_name} - Apresentar ou Dispensar?",
+            options=["Apresentar", "Dispensar"],
+            save_to=None,  # Don't save this response
+            on_yes=None,  # "Apresentar" = go to upload
+            on_no=on_dispensar  # "Dispensar" = save as dispensed
+        ),
+        transitions=[
+            (TransitionCondition.IF_YES, upload_step_name),  # "Apresentar" → upload
+            (TransitionCondition.IF_NO, next_step_after)      # "Dispensar" → skip to next
+        ]
+    ))
+
+    # STEP 2: Upload step
+    machine.register_step(StepDefinition(
+        name=upload_step_name,
+        step_type=StepType.FILE_UPLOAD,
+        handler=FileUploadHandler(
+            step_name=upload_step_name,
+            question=f"Faça upload da {certidao_display_name}:",
+            file_description="PDF ou imagem da certidão",
+            processor=processor
+        ),
+        next_step=next_step_after
+    ))
+
+    logger.debug(f"Created certidão option workflow: {option_step_name} → {upload_step_name} → {next_step_after}")
+
+    return option_step_name
 
 
 def create_workflow() -> WorkflowStateMachine:
@@ -296,7 +396,7 @@ def create_workflow() -> WorkflowStateMachine:
         ),
         transitions=[
             (TransitionCondition.IF_YES, "vendedor_certidao_casamento_upload"),
-            (TransitionCondition.IF_NO, "certidoes_vendedor_pergunta")
+            (TransitionCondition.IF_NO, "certidao_negativa_federal_option")  # Updated
         ]
     ))
 
@@ -325,7 +425,7 @@ def create_workflow() -> WorkflowStateMachine:
         ),
         transitions=[
             (TransitionCondition.IF_YES, "vendedor_conjuge_documento_tipo"),
-            (TransitionCondition.IF_NO, "certidoes_vendedor_pergunta")
+            (TransitionCondition.IF_NO, "certidao_negativa_federal_option")  # Updated
         ]
     ))
 
@@ -352,76 +452,50 @@ def create_workflow() -> WorkflowStateMachine:
             file_description="PDF ou imagem do documento",
             processor=document_processors.process_vendedor_conjuge_documento
         ),
-        next_step="certidoes_vendedor_pergunta"
+        next_step="certidao_negativa_federal_option"  # Updated
     ))
 
-    # Certidões do Vendedor - Pergunta
-    machine.register_step(StepDefinition(
-        name="certidoes_vendedor_pergunta",
-        step_type=StepType.QUESTION,
-        handler=QuestionHandler(
-            step_name="certidoes_vendedor_pergunta",
-            question="O vendedor possui certidões negativas?",
-            options=["Sim", "Não, dispensar certidões"],
-            save_to="temp_data.vendedor_possui_certidoes"
-        ),
-        transitions=[
-            (TransitionCondition.IF_YES, "certidao_negativa_federal_upload"),
-            (TransitionCondition.IF_NO, "mais_vendedores")
-        ]
-    ))
+    # =============================================================================
+    # CERTIDÕES NEGATIVAS DO VENDEDOR (with option workflow)
+    # =============================================================================
 
-    # Certidão Negativa Federal Upload
-    machine.register_step(StepDefinition(
-        name="certidao_negativa_federal_upload",
-        step_type=StepType.FILE_UPLOAD,
-        handler=FileUploadHandler(
-            step_name="certidao_negativa_federal_upload",
-            question="Faça upload da Certidão Negativa Federal:",
-            file_description="PDF ou imagem da certidão",
-            processor=document_processors.process_certidao_negativa_federal
-        ),
-        next_step="certidao_negativa_estadual_upload"
-    ))
+    # Federal → Estadual → Municipal → Trabalhista → mais_vendedores
+    create_certidao_option_workflow(
+        machine,
+        certidao_tipo="negativa_trabalhista",
+        certidao_display_name="Certidão Negativa Trabalhista",
+        processor=document_processors.process_certidao_negativa_trabalhista,
+        next_step_after="mais_vendedores",
+        vendedor_specific=True
+    )
 
-    # Certidão Negativa Estadual Upload
-    machine.register_step(StepDefinition(
-        name="certidao_negativa_estadual_upload",
-        step_type=StepType.FILE_UPLOAD,
-        handler=FileUploadHandler(
-            step_name="certidao_negativa_estadual_upload",
-            question="Faça upload da Certidão Negativa Estadual:",
-            file_description="PDF ou imagem da certidão",
-            processor=document_processors.process_certidao_negativa_estadual
-        ),
-        next_step="certidao_negativa_municipal_upload"
-    ))
+    create_certidao_option_workflow(
+        machine,
+        certidao_tipo="negativa_municipal",
+        certidao_display_name="Certidão Negativa Municipal",
+        processor=document_processors.process_certidao_negativa_municipal,
+        next_step_after="certidao_negativa_trabalhista_option",
+        vendedor_specific=True
+    )
 
-    # Certidão Negativa Municipal Upload
-    machine.register_step(StepDefinition(
-        name="certidao_negativa_municipal_upload",
-        step_type=StepType.FILE_UPLOAD,
-        handler=FileUploadHandler(
-            step_name="certidao_negativa_municipal_upload",
-            question="Faça upload da Certidão Negativa Municipal:",
-            file_description="PDF ou imagem da certidão",
-            processor=document_processors.process_certidao_negativa_municipal
-        ),
-        next_step="certidao_negativa_trabalhista_upload"
-    ))
+    create_certidao_option_workflow(
+        machine,
+        certidao_tipo="negativa_estadual",
+        certidao_display_name="Certidão Negativa Estadual",
+        processor=document_processors.process_certidao_negativa_estadual,
+        next_step_after="certidao_negativa_municipal_option",
+        vendedor_specific=True
+    )
 
-    # Certidão Negativa Trabalhista Upload
-    machine.register_step(StepDefinition(
-        name="certidao_negativa_trabalhista_upload",
-        step_type=StepType.FILE_UPLOAD,
-        handler=FileUploadHandler(
-            step_name="certidao_negativa_trabalhista_upload",
-            question="Faça upload da Certidão Negativa Trabalhista:",
-            file_description="PDF ou imagem da certidão",
-            processor=document_processors.process_certidao_negativa_trabalhista
-        ),
-        next_step="mais_vendedores"
-    ))
+    # Entry point for vendedor certidões (from vendedor_casado or vendedor_conjuge_documento_upload)
+    create_certidao_option_workflow(
+        machine,
+        certidao_tipo="negativa_federal",
+        certidao_display_name="Certidão Negativa Federal",
+        processor=document_processors.process_certidao_negativa_federal,
+        next_step_after="certidao_negativa_estadual_option",
+        vendedor_specific=True
+    )
 
     # Mais Vendedores?
     machine.register_step(StepDefinition(
@@ -437,26 +511,43 @@ def create_workflow() -> WorkflowStateMachine:
         ),
         transitions=[
             (TransitionCondition.IF_YES, "vendedor_tipo"),
-            (TransitionCondition.IF_NO, "certidao_onus_upload")
+            (TransitionCondition.IF_NO, "certidao_matricula_option")  # Start with matricula
         ]
     ))
 
     # =============================================================================
-    # CERTIDÕES FLOW
+    # CERTIDÕES DO IMÓVEL (property-level, with option workflow)
     # =============================================================================
 
-    # Certidão de Ônus Reais Upload (property-level)
-    machine.register_step(StepDefinition(
-        name="certidao_onus_upload",
-        step_type=StepType.FILE_UPLOAD,
-        handler=FileUploadHandler(
-            step_name="certidao_onus_upload",
-            question="Faça upload da Certidão de Ônus Reais do imóvel:",
-            file_description="PDF ou imagem da certidão",
-            processor=document_processors.process_certidao_onus
-        ),
-        next_step="check_tipo_escritura_condominio"
-    ))
+    # Matrícula do Imóvel (property-level) - documento base
+    create_certidao_option_workflow(
+        machine,
+        certidao_tipo="matricula",
+        certidao_display_name="Matrícula do Imóvel",
+        processor=document_processors.process_certidao_matricula,
+        next_step_after="certidao_iptu_option",
+        vendedor_specific=False  # Property-level
+    )
+
+    # IPTU (property-level) - imposto
+    create_certidao_option_workflow(
+        machine,
+        certidao_tipo="iptu",
+        certidao_display_name="Certidão de IPTU",
+        processor=document_processors.process_certidao_iptu,
+        next_step_after="certidao_onus_option",
+        vendedor_specific=False  # Property-level
+    )
+
+    # Certidão de Ônus Reais (property-level)
+    create_certidao_option_workflow(
+        machine,
+        certidao_tipo="onus",
+        certidao_display_name="Certidão de Ônus Reais",
+        processor=document_processors.process_certidao_onus,
+        next_step_after="check_tipo_escritura_condominio",
+        vendedor_specific=False  # Property-level
+    )
 
     # Check if Apto needs condomínio certidão
     machine.register_step(StepDefinition(
@@ -469,23 +560,30 @@ def create_workflow() -> WorkflowStateMachine:
             save_to=None
         ),
         transitions=[
-            (TransitionCondition.IF_YES, "certidao_condominio_upload"),
+            (TransitionCondition.IF_YES, "certidao_condominio_option"),  # Updated
             (TransitionCondition.IF_NO, "valor_imovel")
         ]
     ))
 
-    # Certidão Condomínio (for Apto)
-    machine.register_step(StepDefinition(
-        name="certidao_condominio_upload",
-        step_type=StepType.FILE_UPLOAD,
-        handler=FileUploadHandler(
-            step_name="certidao_condominio_upload",
-            question="Faça upload da Certidão de Condomínio:",
-            file_description="PDF ou imagem da certidão",
-            processor=document_processors.process_certidao_condominio
-        ),
-        next_step="valor_imovel"
-    ))
+    # Certidão Condomínio (for Apto) - with option workflow
+    create_certidao_option_workflow(
+        machine,
+        certidao_tipo="condominio",
+        certidao_display_name="Certidão de Condomínio",
+        processor=document_processors.process_certidao_condominio,
+        next_step_after="certidao_objeto_pe_option",
+        vendedor_specific=False  # Property-level
+    )
+
+    # Certidão de Objeto e Pé (for Apto) - with option workflow
+    create_certidao_option_workflow(
+        machine,
+        certidao_tipo="objeto_pe",
+        certidao_display_name="Certidão de Objeto e Pé",
+        processor=document_processors.process_certidao_objeto_pe,
+        next_step_after="valor_imovel",
+        vendedor_specific=False  # Property-level
+    )
 
     # =============================================================================
     # PAYMENT FLOW

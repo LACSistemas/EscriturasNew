@@ -448,6 +448,60 @@ async def process_certidao_condominio(file_data: bytes, filename: str, session: 
     )
 
 
+async def process_certidao_iptu(file_data: bytes, filename: str, session: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+    """Process certidão de IPTU - Imposto Predial e Territorial Urbano (property-level)"""
+    return await process_certidao_generic(
+        file_data, filename, session,
+        tipo="iptu",
+        prompt="1: Inscrição Imobiliária, 2: Endereço do Imóvel, 3: Último Ano Pago, 4: Débitos Pendentes (Sim/Não), 5: Valor dos Débitos (se houver)",
+        field_mapping={
+            "Inscrição Imobiliária": "inscricao_imobiliaria",
+            "Endereço do Imóvel": "endereco",
+            "Último Ano Pago": "ultimo_ano_pago",
+            "Débitos Pendentes (Sim/Não)": "possui_debitos",
+            "Valor dos Débitos (se houver)": "valor_debitos"
+        },
+        vendedor_specific=False,
+        **kwargs
+    )
+
+
+async def process_certidao_matricula(file_data: bytes, filename: str, session: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+    """Process matrícula do imóvel (property-level)"""
+    return await process_certidao_generic(
+        file_data, filename, session,
+        tipo="matricula",
+        prompt="1: Número da Matrícula, 2: Cartório de Registro, 3: Proprietário Atual, 4: Área do Imóvel, 5: Endereço Completo",
+        field_mapping={
+            "Número da Matrícula": "numero_matricula",
+            "Cartório de Registro": "cartorio",
+            "Proprietário Atual": "proprietario",
+            "Área do Imóvel": "area",
+            "Endereço Completo": "endereco"
+        },
+        vendedor_specific=False,
+        **kwargs
+    )
+
+
+async def process_certidao_objeto_pe(file_data: bytes, filename: str, session: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+    """Process certidão de objeto e pé - para apartamentos (property-level)"""
+    return await process_certidao_generic(
+        file_data, filename, session,
+        tipo="objeto_pe",
+        prompt="1: Número da Matrícula, 2: Unidade/Apartamento, 3: Bloco/Torre, 4: Data de Emissão, 5: Validade",
+        field_mapping={
+            "Número da Matrícula": "matricula",
+            "Unidade/Apartamento": "unidade",
+            "Bloco/Torre": "bloco",
+            "Data de Emissão": "data_emissao",
+            "Validade": "validade"
+        },
+        vendedor_specific=False,
+        **kwargs
+    )
+
+
 async def process_certidao_indisponibilidade(file_data: bytes, filename: str, session: Dict[str, Any], **kwargs) -> Dict[str, Any]:
     """Process certidão de indisponibilidade de bens (vendedor-specific)"""
     return await process_certidao_generic(
