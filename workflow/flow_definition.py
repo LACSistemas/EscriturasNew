@@ -511,12 +511,112 @@ def create_workflow() -> WorkflowStateMachine:
         ),
         transitions=[
             (TransitionCondition.IF_YES, "vendedor_tipo"),
-            (TransitionCondition.IF_NO, "certidao_matricula_option")  # Start with matricula
+            (TransitionCondition.IF_NO, "check_tipo_escritura_certidoes")  # Check urban vs rural
         ]
     ))
 
     # =============================================================================
-    # CERTIDÕES DO IMÓVEL (property-level, with option workflow)
+    # CONDITIONAL: URBAN vs RURAL CERTIDÕES
+    # =============================================================================
+
+    # Check if escritura is rural
+    machine.register_step(StepDefinition(
+        name="check_tipo_escritura_certidoes",
+        step_type=StepType.QUESTION,
+        handler=QuestionHandler(
+            step_name="check_tipo_escritura_certidoes",
+            question="O imóvel é rural?",
+            options=["Sim", "Não"],
+            save_to=None  # Don't save, we already have tipo_escritura
+        ),
+        transitions=[
+            (TransitionCondition.IF_YES, "certidao_itr_option"),  # Rural → ITR
+            (TransitionCondition.IF_NO, "certidao_matricula_option")  # Urbano → matricula
+        ]
+    ))
+
+    # =============================================================================
+    # CERTIDÕES RURAIS (property-level, with option workflow)
+    # =============================================================================
+
+    # ITR - Imposto Territorial Rural (property-level)
+    create_certidao_option_workflow(
+        machine,
+        certidao_tipo="itr",
+        certidao_display_name="ITR - Imposto Territorial Rural",
+        processor=document_processors.process_certidao_itr,
+        next_step_after="certidao_ccir_option",
+        vendedor_specific=False  # Property-level
+    )
+
+    # CCIR - Certificado de Cadastro de Imóvel Rural (property-level)
+    create_certidao_option_workflow(
+        machine,
+        certidao_tipo="ccir",
+        certidao_display_name="CCIR - Certificado de Cadastro de Imóvel Rural",
+        processor=document_processors.process_certidao_ccir,
+        next_step_after="certidao_incra_option",
+        vendedor_specific=False  # Property-level
+    )
+
+    # INCRA - Certidão Negativa INCRA (property-level)
+    create_certidao_option_workflow(
+        machine,
+        certidao_tipo="incra",
+        certidao_display_name="Certidão Negativa INCRA",
+        processor=document_processors.process_certidao_incra,
+        next_step_after="certidao_ibama_option",
+        vendedor_specific=False  # Property-level
+    )
+
+    # IBAMA - Certidão Negativa IBAMA (property-level)
+    create_certidao_option_workflow(
+        machine,
+        certidao_tipo="ibama",
+        certidao_display_name="Certidão Negativa IBAMA",
+        processor=document_processors.process_certidao_ibama,
+        next_step_after="check_desmembramento",
+        vendedor_specific=False  # Property-level
+    )
+
+    # Check if has desmembramento
+    machine.register_step(StepDefinition(
+        name="check_desmembramento",
+        step_type=StepType.QUESTION,
+        handler=QuestionHandler(
+            step_name="check_desmembramento",
+            question="A escritura rural possui desmembramento de área?",
+            options=["Sim", "Não"],
+            save_to=None
+        ),
+        transitions=[
+            (TransitionCondition.IF_YES, "art_desmembramento_option"),
+            (TransitionCondition.IF_NO, "valor_imovel")
+        ]
+    ))
+
+    # ART de Desmembramento (for rural desmembramento) - with option
+    create_certidao_option_workflow(
+        machine,
+        certidao_tipo="art_desmembramento",
+        certidao_display_name="ART de Desmembramento",
+        processor=document_processors.process_art_desmembramento,
+        next_step_after="planta_desmembramento_option",
+        vendedor_specific=False  # Property-level
+    )
+
+    # Planta de Desmembramento (for rural desmembramento) - with option
+    create_certidao_option_workflow(
+        machine,
+        certidao_tipo="planta_desmembramento",
+        certidao_display_name="Planta de Desmembramento",
+        processor=document_processors.process_planta_desmembramento,
+        next_step_after="valor_imovel",
+        vendedor_specific=False  # Property-level
+    )
+
+    # =============================================================================
+    # CERTIDÕES URBANAS (property-level, with option workflow)
     # =============================================================================
 
     # Matrícula do Imóvel (property-level) - documento base
