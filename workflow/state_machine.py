@@ -189,10 +189,36 @@ class WorkflowStateMachine:
 
     def _validate_transition(self, from_step: str, to_step: str):
         """Validate that transition is allowed"""
+        # Check if destination step exists
         if to_step not in self.steps:
             raise ValueError(f"Invalid transition: {from_step} -> {to_step} (step not found)")
 
-        # Additional validation logic can be added here
+        # Check if source step exists
+        if from_step not in self.steps:
+            raise ValueError(f"Invalid transition source: {from_step} (step not found)")
+
+        # Get source step definition
+        source_step = self.steps[from_step]
+
+        # Build list of valid destinations from this step
+        valid_destinations = set()
+
+        # Add default next_step
+        if source_step.next_step:
+            valid_destinations.add(source_step.next_step)
+
+        # Add conditional transition destinations
+        for _, dest in source_step.transitions:
+            valid_destinations.add(dest)
+
+        # Validate transition is in allowed list
+        if to_step not in valid_destinations:
+            raise ValueError(
+                f"Invalid transition: {from_step} -> {to_step}. "
+                f"Allowed destinations: {', '.join(sorted(valid_destinations))}"
+            )
+
+        logger.debug(f"Validated transition: {from_step} -> {to_step}")
         return True
 
     def _calculate_progress(self, session: Dict[str, Any]) -> str:

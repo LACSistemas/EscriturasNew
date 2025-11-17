@@ -10,7 +10,7 @@ from typing import Optional
 
 from config import sessions
 from workflow.flow_definition import get_workflow
-from models.session import SessionData
+from models.session import SessionData, create_new_session_dict
 from models.schemas import StepResponse, ProcessCompleteResponse
 
 router = APIRouter(tags=["processing-sm"])

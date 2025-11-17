@@ -85,24 +85,29 @@ class SessionData:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary (for compatibility with existing code)"""
-        return {
+        result = {
             "id": self.id,
             "current_step": self.current_step,
             "step_number": self.step_number,
             "tipo_escritura": self.tipo_escritura,
             "is_rural": self.is_rural,
             "tipo_escritura_rural": self.tipo_escritura_rural,
-            "compradores": [vars(c) for c in self.compradores],
-            "vendedores": [vars(v) for v in self.vendedores],
+            "compradores": [vars(c) if not isinstance(c, dict) else c for c in self.compradores],
+            "vendedores": [vars(v) if not isinstance(v, dict) else v for v in self.vendedores],
             "certidoes": self._certidoes_to_legacy_format(),
             "valor": self.valor,
             "forma_pagamento": self.forma_pagamento,
             "meio_pagamento": self.meio_pagamento,
-            "temp_data": {
-                "current_comprador": vars(self.temp_comprador) if self.temp_comprador else None,
-                "current_vendedor": vars(self.temp_vendedor) if self.temp_vendedor else None,
-            }
+            "temp_data": {}
         }
+
+        # Build temp_data compatible with current code
+        if self.temp_comprador:
+            result["temp_data"]["current_comprador"] = vars(self.temp_comprador) if not isinstance(self.temp_comprador, dict) else self.temp_comprador
+        if self.temp_vendedor:
+            result["temp_data"]["current_vendedor"] = vars(self.temp_vendedor) if not isinstance(self.temp_vendedor, dict) else self.temp_vendedor
+
+        return result
 
     def _certidoes_to_legacy_format(self) -> Dict[str, Any]:
         """Convert normalized certidoes to legacy dict format"""
@@ -213,3 +218,96 @@ class SessionData:
         if self.temp_vendedor:
             self.vendedores.append(self.temp_vendedor)
             self.temp_vendedor = None
+
+
+# ============================================================================
+# HYBRID HELPERS - Allow using dict-based sessions with normalized data
+# ============================================================================
+
+def ensure_temp_data(session: Dict[str, Any]) -> Dict[str, Any]:
+    """Ensure session has temp_data dict"""
+    if "temp_data" not in session:
+        session["temp_data"] = {}
+    return session["temp_data"]
+
+
+def get_current_comprador(session: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Get current comprador being built"""
+    return session.get("temp_data", {}).get("current_comprador")
+
+
+def set_current_comprador(session: Dict[str, Any], comprador: Dict[str, Any]):
+    """Set current comprador"""
+    ensure_temp_data(session)
+    session["temp_data"]["current_comprador"] = comprador
+
+
+def get_current_vendedor(session: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Get current vendedor being built"""
+    return session.get("temp_data", {}).get("current_vendedor")
+
+
+def set_current_vendedor(session: Dict[str, Any], vendedor: Dict[str, Any]):
+    """Set current vendedor"""
+    ensure_temp_data(session)
+    session["temp_data"]["current_vendedor"] = vendedor
+
+
+def finalize_and_add_comprador(session: Dict[str, Any]) -> None:
+    """Move current comprador from temp_data to compradores list"""
+    current = get_current_comprador(session)
+    if current:
+        if "compradores" not in session:
+            session["compradores"] = []
+        session["compradores"].append(current)
+        session["temp_data"]["current_comprador"] = None
+
+
+def finalize_and_add_vendedor(session: Dict[str, Any]) -> None:
+    """Move current vendedor from temp_data to vendedores list"""
+    current = get_current_vendedor(session)
+    if current:
+        if "vendedores" not in session:
+            session["vendedores"] = []
+        session["vendedores"].append(current)
+        session["temp_data"]["current_vendedor"] = None
+
+
+def add_certidao_to_session(
+    session: Dict[str, Any],
+    tipo: str,
+    data: Dict[str, Any],
+    vendedor_index: Optional[int] = None,
+    dispensada: bool = False
+) -> None:
+    """Add certificate to session (legacy format)"""
+    if "certidoes" not in session:
+        session["certidoes"] = {}
+
+    if vendedor_index is None:
+        key = tipo
+    else:
+        key = f"{tipo}_{vendedor_index}"
+
+    session["certidoes"][key] = {
+        **data,
+        "dispensada": dispensada
+    }
+
+
+def create_new_session_dict(session_id: str) -> Dict[str, Any]:
+    """Create a new session dict with proper structure"""
+    return {
+        "id": session_id,
+        "current_step": "tipo_escritura",
+        "step_number": 1,
+        "tipo_escritura": None,
+        "is_rural": False,
+        "compradores": [],
+        "vendedores": [],
+        "certidoes": {},
+        "temp_data": {},
+        "valor": None,
+        "forma_pagamento": None,
+        "meio_pagamento": None
+    }

@@ -2,6 +2,7 @@
 from workflow.state_machine import WorkflowStateMachine, StepDefinition, StepType, TransitionCondition
 from workflow.handlers.base_handlers import QuestionHandler, TextInputHandler, FileUploadHandler, DynamicQuestionHandler, CallbackQuestionHandler
 from workflow.handlers import document_processors
+from models.session import finalize_and_add_comprador, finalize_and_add_vendedor, ensure_temp_data
 from typing import Dict, Any
 import logging
 
@@ -14,46 +15,37 @@ logger = logging.getLogger(__name__)
 
 async def finalize_comprador(session: Dict[str, Any]):
     """Finalize current comprador - move from temp_data to compradores list"""
-    temp_data = session.get("temp_data", {})
-    current_comprador = temp_data.get("current_comprador")
+    finalize_and_add_comprador(session)
 
+    # Clear additional temp fields
+    temp_data = ensure_temp_data(session)
+    temp_data["documento_tipo"] = None
+    temp_data["tipo_pessoa"] = None
+    temp_data["conjuge_doc_tipo"] = None
+
+    current_comprador = session.get("compradores", [])[-1] if session.get("compradores") else None
     if current_comprador:
-        # Initialize compradores list if needed
-        if "compradores" not in session:
-            session["compradores"] = []
-
-        # Add to list
-        session["compradores"].append(current_comprador)
         logger.info(f"Finalized comprador: {current_comprador.get('nome_completo', 'Unknown')}")
-
-        # Clear temp_data for next comprador
-        temp_data["current_comprador"] = None
-        temp_data["documento_tipo"] = None
-        temp_data["tipo_pessoa"] = None
 
 
 async def finalize_vendedor(session: Dict[str, Any]):
     """Finalize current vendedor - move from temp_data to vendedores list"""
-    temp_data = session.get("temp_data", {})
-    current_vendedor = temp_data.get("current_vendedor")
+    finalize_and_add_vendedor(session)
 
+    # Store vendedor index for certidões
+    temp_data = ensure_temp_data(session)
+    vendedor_index = len(session.get("vendedores", [])) - 1
+    temp_data["current_vendedor_index"] = vendedor_index
+
+    # Clear additional temp fields
+    temp_data["documento_tipo"] = None
+    temp_data["tipo_pessoa"] = None
+    temp_data["conjuge_doc_tipo"] = None
+    temp_data["vendedor_possui_certidoes"] = None
+
+    current_vendedor = session.get("vendedores", [])[-1] if session.get("vendedores") else None
     if current_vendedor:
-        # Initialize vendedores list if needed
-        if "vendedores" not in session:
-            session["vendedores"] = []
-
-        # Store vendedor index for certidões
-        vendedor_index = len(session["vendedores"])
-        temp_data["current_vendedor_index"] = vendedor_index
-
-        # Add to list
-        session["vendedores"].append(current_vendedor)
         logger.info(f"Finalized vendedor: {current_vendedor.get('nome_completo', 'Unknown')}")
-
-        # Clear temp_data for next vendedor
-        temp_data["current_vendedor"] = None
-        temp_data["documento_tipo"] = None
-        temp_data["tipo_pessoa"] = None
 
 
 def create_workflow() -> WorkflowStateMachine:
