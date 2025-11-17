@@ -3,6 +3,7 @@ import logging
 import asyncio
 from google.cloud import vision
 import fitz  # PyMuPDF
+from utils.error_handler import async_retry, OCRError, log_processing_step, log_error
 
 logger = logging.getLogger(__name__)
 
@@ -45,28 +46,39 @@ def _convert_pdf_to_image(file_content: bytes) -> bytes:
         raise Exception(f"Error processing PDF: {str(e)}")
 
 
+@async_retry(max_attempts=3, delay=1.0, backoff=2.0, exceptions=(Exception,))
 async def extract_text_from_image_async(image_content: bytes, vision_client=None) -> str:
-    """Extract text from image using Google Vision API asynchronously"""
-    if not vision_client:
-        raise Exception("Google Cloud Vision client is not available. Check credentials configuration.")
+    """Extract text from image using Google Vision API asynchronously with retry logic"""
+    try:
+        if not vision_client:
+            raise OCRError("Google Cloud Vision client is not available. Check credentials configuration.")
 
-    image = vision.Image(content=image_content)
+        log_processing_step("OCR", {"size": len(image_content)})
 
-    # Vision API calls are I/O-bound, run in executor
-    loop = asyncio.get_event_loop()
-    response = await loop.run_in_executor(
-        None,
-        vision_client.text_detection,
-        image
-    )
+        image = vision.Image(content=image_content)
 
-    if response.error.message:
-        raise Exception(f"Vision API Error: {response.error.message}")
+        # Vision API calls are I/O-bound, run in executor
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(
+            None,
+            vision_client.text_detection,
+            image
+        )
 
-    extracted_text = response.full_text_annotation.text if response.full_text_annotation else ""
-    if not extracted_text:
-        logger.warning("WARNING: Vision API extracted no text from image")
-    else:
-        logger.info(f"DEBUG: Vision API extracted {len(extracted_text)} characters")
+        if response.error.message:
+            raise OCRError(f"Vision API Error: {response.error.message}")
 
-    return extracted_text
+        extracted_text = response.full_text_annotation.text if response.full_text_annotation else ""
+
+        if not extracted_text:
+            logger.warning("⚠️  Vision API extracted no text from image")
+        else:
+            logger.info(f"✅ Vision API extracted {len(extracted_text)} characters")
+
+        return extracted_text
+
+    except OCRError:
+        raise  # Re-raise OCRError to trigger retry
+    except Exception as e:
+        log_error(e, "OCR extraction")
+        raise OCRError(f"OCR extraction failed: {str(e)}") from e
