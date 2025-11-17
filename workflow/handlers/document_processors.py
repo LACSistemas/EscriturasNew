@@ -2,6 +2,7 @@
 from typing import Dict, Any
 from services.ocr_service_async import extract_text_from_file_async
 from services.ai_service_async import extract_data_with_gemini_async
+from models.session import set_current_comprador, set_current_vendedor, add_certidao_to_session, ensure_temp_data
 
 
 async def process_documento_comprador(file_data: bytes, filename: str, session: Dict[str, Any], **kwargs) -> Dict[str, Any]:
@@ -13,7 +14,8 @@ async def process_documento_comprador(file_data: bytes, filename: str, session: 
     text = await extract_text_from_file_async(file_data, filename, vision_client)
 
     # Determine prompt based on document type
-    doc_type = session.get("temp_data", {}).get("documento_tipo", "")
+    temp_data = ensure_temp_data(session)
+    doc_type = temp_data.get("documento_tipo", "")
 
     if doc_type == "Carteira de Identidade":
         prompt = "1: Nome Completo, 2: Data de Nascimento, 3: Número do CPF, 4: Gênero (analise o primeiro nome e determine se é tipicamente Masculino ou Feminino baseado em nomes brasileiros típicos. Considere nomes como João, Carlos, Pedro, Lucas, Rafael = Masculino; Maria, Ana, Carla, Cecilia, Fernanda = Feminino. Se incerto, use Masculino)"
@@ -45,9 +47,8 @@ async def process_documento_comprador(file_data: bytes, filename: str, session: 
         comprador["ctps_numero"] = extracted.get("Número da Carteira", "")
         comprador["sexo"] = extracted.get("Gênero", "")
 
-    # Store in temp_data
-    session.setdefault("temp_data", {})["current_comprador"] = comprador
-
+    # Store using helper
+    set_current_comprador(session, comprador)
     return comprador
 
 
@@ -68,7 +69,8 @@ async def process_empresa_comprador(file_data: bytes, filename: str, session: Di
         "representante_legal": extracted.get("Nome do Representante Legal", "")
     }
 
-    session.setdefault("temp_data", {})["current_comprador"] = comprador
+    # Store using helper
+    set_current_comprador(session, comprador)
     return comprador
 
 
@@ -88,9 +90,10 @@ async def process_certidao_casamento(file_data: bytes, filename: str, session: D
         "cartorio": extracted.get("Cartório de Registro", "")
     }
 
-    # Store in current_comprador
-    if "current_comprador" in session.get("temp_data", {}):
-        session["temp_data"]["current_comprador"]["certidao_casamento"] = certidao_data
+    # Store using helper
+    temp_data = ensure_temp_data(session)
+    if "current_comprador" in temp_data and temp_data["current_comprador"]:
+        temp_data["current_comprador"]["certidao_casamento"] = certidao_data
 
     return certidao_data
 
@@ -129,9 +132,10 @@ async def process_documento_conjuge(file_data: bytes, filename: str, session: Di
         conjuge_data["ctps_serie"] = extracted.get("Série da Carteira", "")
         conjuge_data["ctps_numero"] = extracted.get("Número da Carteira", "")
 
-    # Store in current_comprador
-    if "current_comprador" in session.get("temp_data", {}):
-        session["temp_data"]["current_comprador"]["conjuge_data"] = conjuge_data
+    # Store using helper
+    temp_data = ensure_temp_data(session)
+    if "current_comprador" in temp_data and temp_data["current_comprador"]:
+        temp_data["current_comprador"]["conjuge_data"] = conjuge_data
 
     return conjuge_data
 
@@ -174,7 +178,8 @@ async def process_documento_vendedor(file_data: bytes, filename: str, session: D
         vendedor["ctps_serie"] = extracted.get("Série da Carteira", "")
         vendedor["ctps_numero"] = extracted.get("Número da Carteira", "")
 
-    session.setdefault("temp_data", {})["current_vendedor"] = vendedor
+    # Store using helper
+    set_current_vendedor(session, vendedor)
     return vendedor
 
 
@@ -195,7 +200,8 @@ async def process_empresa_vendedor(file_data: bytes, filename: str, session: Dic
         "representante_legal": extracted.get("Nome do Representante Legal", "")
     }
 
-    session.setdefault("temp_data", {})["current_vendedor"] = vendedor
+    # Store using helper
+    set_current_vendedor(session, vendedor)
     return vendedor
 
 
@@ -232,10 +238,61 @@ async def process_vendedor_conjuge_documento(file_data: bytes, filename: str, se
         conjuge_data["ctps_serie"] = extracted.get("Série da Carteira", "")
         conjuge_data["ctps_numero"] = extracted.get("Número da Carteira", "")
 
-    if "current_vendedor" in session.get("temp_data", {}):
-        session["temp_data"]["current_vendedor"]["conjuge_data"] = conjuge_data
+    # Store using helper
+    temp_data = ensure_temp_data(session)
+    if "current_vendedor" in temp_data and temp_data["current_vendedor"]:
+        temp_data["current_vendedor"]["conjuge_data"] = conjuge_data
 
     return conjuge_data
+
+
+# ============================================================================
+# GENERIC CERTIDÃO PROCESSOR (DRY)
+# ============================================================================
+
+async def process_certidao_generic(
+    file_data: bytes,
+    filename: str,
+    session: Dict[str, Any],
+    tipo: str,
+    prompt: str,
+    field_mapping: dict,
+    vendedor_specific: bool = False,
+    **kwargs
+) -> Dict[str, Any]:
+    """
+    Generic certificate processor - DRY pattern
+
+    Args:
+        tipo: Certificate type (e.g., "negativa_federal")
+        prompt: AI extraction prompt
+        field_mapping: Map of extracted fields to certidao fields
+        vendedor_specific: True if certidão is tied to specific vendedor
+    """
+    vision_client = kwargs.get('vision_client')
+    gemini_model = kwargs.get('gemini_model')
+
+    # Extract text with OCR
+    text = await extract_text_from_file_async(file_data, filename, vision_client)
+
+    # Extract data with AI
+    extracted = await extract_data_with_gemini_async(text, prompt, gemini_model)
+
+    # Build certidao using field mapping
+    certidao = {"tipo": tipo, "dispensada": False}
+    for extract_key, certidao_key in field_mapping.items():
+        certidao[certidao_key] = extracted.get(extract_key, "")
+
+    # Get vendedor index if needed
+    vendedor_index = None
+    if vendedor_specific:
+        temp_data = ensure_temp_data(session)
+        vendedor_index = temp_data.get("current_vendedor_index", 0)
+        certidao["vendedor_index"] = vendedor_index
+
+    # Store using helper
+    add_certidao_to_session(session, tipo, certidao, vendedor_index=vendedor_index)
+    return certidao
 
 
 # ============================================================================
@@ -260,7 +317,8 @@ async def process_certidao_onus(file_data: bytes, filename: str, session: Dict[s
         "descricao_onus": extracted.get("Descrição dos Ônus (se houver)", "")
     }
 
-    session.setdefault("certidoes", {})["onus"] = certidao
+    # Store using helper
+    add_certidao_to_session(session, "onus", certidao, dispensada=False)
     return certidao
 
 
@@ -273,7 +331,8 @@ async def process_certidao_negativa_federal(file_data: bytes, filename: str, ses
     prompt = "1: Nome do Titular, 2: CPF/CNPJ, 3: Data de Emissão, 4: Validade"
     extracted = await extract_data_with_gemini_async(text, prompt, gemini_model)
 
-    vendedor_index = session.get("temp_data", {}).get("current_vendedor_index", 0)
+    temp_data = ensure_temp_data(session)
+    vendedor_index = temp_data.get("current_vendedor_index", 0)
 
     certidao = {
         "tipo": "negativa_federal",
@@ -285,9 +344,8 @@ async def process_certidao_negativa_federal(file_data: bytes, filename: str, ses
         "dispensada": False
     }
 
-    # Store with vendedor index
-    key = f"negativa_federal_{vendedor_index}"
-    session.setdefault("certidoes", {})[key] = certidao
+    # Store using helper
+    add_certidao_to_session(session, "negativa_federal", certidao, vendedor_index=vendedor_index)
     return certidao
 
 
@@ -300,7 +358,8 @@ async def process_certidao_negativa_estadual(file_data: bytes, filename: str, se
     prompt = "1: Nome do Titular, 2: CPF/CNPJ, 3: Data de Emissão, 4: Validade"
     extracted = await extract_data_with_gemini_async(text, prompt, gemini_model)
 
-    vendedor_index = session.get("temp_data", {}).get("current_vendedor_index", 0)
+    temp_data = ensure_temp_data(session)
+    vendedor_index = temp_data.get("current_vendedor_index", 0)
 
     certidao = {
         "tipo": "negativa_estadual",
@@ -312,8 +371,7 @@ async def process_certidao_negativa_estadual(file_data: bytes, filename: str, se
         "dispensada": False
     }
 
-    key = f"negativa_estadual_{vendedor_index}"
-    session.setdefault("certidoes", {})[key] = certidao
+    add_certidao_to_session(session, "negativa_estadual", certidao, vendedor_index=vendedor_index)
     return certidao
 
 
@@ -326,7 +384,8 @@ async def process_certidao_negativa_municipal(file_data: bytes, filename: str, s
     prompt = "1: Nome do Titular, 2: CPF/CNPJ, 3: Data de Emissão, 4: Validade"
     extracted = await extract_data_with_gemini_async(text, prompt, gemini_model)
 
-    vendedor_index = session.get("temp_data", {}).get("current_vendedor_index", 0)
+    temp_data = ensure_temp_data(session)
+    vendedor_index = temp_data.get("current_vendedor_index", 0)
 
     certidao = {
         "tipo": "negativa_municipal",
@@ -338,8 +397,7 @@ async def process_certidao_negativa_municipal(file_data: bytes, filename: str, s
         "dispensada": False
     }
 
-    key = f"negativa_municipal_{vendedor_index}"
-    session.setdefault("certidoes", {})[key] = certidao
+    add_certidao_to_session(session, "negativa_municipal", certidao, vendedor_index=vendedor_index)
     return certidao
 
 
@@ -352,7 +410,8 @@ async def process_certidao_negativa_trabalhista(file_data: bytes, filename: str,
     prompt = "1: Nome do Titular, 2: CPF/CNPJ, 3: Data de Emissão, 4: Validade"
     extracted = await extract_data_with_gemini_async(text, prompt, gemini_model)
 
-    vendedor_index = session.get("temp_data", {}).get("current_vendedor_index", 0)
+    temp_data = ensure_temp_data(session)
+    vendedor_index = temp_data.get("current_vendedor_index", 0)
 
     certidao = {
         "tipo": "negativa_trabalhista",
@@ -364,6 +423,177 @@ async def process_certidao_negativa_trabalhista(file_data: bytes, filename: str,
         "dispensada": False
     }
 
-    key = f"negativa_trabalhista_{vendedor_index}"
-    session.setdefault("certidoes", {})[key] = certidao
+    add_certidao_to_session(session, "negativa_trabalhista", certidao, vendedor_index=vendedor_index)
+    return certidao
+
+
+# ============================================================================
+# ADDITIONAL URBAN CERTIDÕES (using generic processor)
+# ============================================================================
+
+async def process_certidao_condominio(file_data: bytes, filename: str, session: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+    """Process certidão de condomínio (property-level)"""
+    return await process_certidao_generic(
+        file_data, filename, session,
+        tipo="condominio",
+        prompt="1: Número da Matrícula, 2: Data de Emissão, 3: Débitos Pendentes (Sim/Não), 4: Valor dos Débitos (se houver)",
+        field_mapping={
+            "Número da Matrícula": "matricula",
+            "Data de Emissão": "data_emissao",
+            "Débitos Pendentes (Sim/Não)": "possui_debitos",
+            "Valor dos Débitos (se houver)": "valor_debitos"
+        },
+        vendedor_specific=False,
+        **kwargs
+    )
+
+
+async def process_certidao_indisponibilidade(file_data: bytes, filename: str, session: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+    """Process certidão de indisponibilidade de bens (vendedor-specific)"""
+    return await process_certidao_generic(
+        file_data, filename, session,
+        tipo="indisponibilidade",
+        prompt="1: Nome do Titular, 2: CPF/CNPJ, 3: Data de Emissão, 4: Validade, 5: Possui Indisponibilidade (Sim/Não)",
+        field_mapping={
+            "Nome do Titular": "titular",
+            "CPF/CNPJ": "cpf_cnpj",
+            "Data de Emissão": "data_emissao",
+            "Validade": "validade",
+            "Possui Indisponibilidade (Sim/Não)": "possui_indisponibilidade"
+        },
+        vendedor_specific=True,
+        **kwargs
+    )
+
+
+async def process_certidao_distribuidora(file_data: bytes, filename: str, session: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+    """Process certidão distribuidora (vendedor-specific)"""
+    return await process_certidao_generic(
+        file_data, filename, session,
+        tipo="distribuidora",
+        prompt="1: Nome do Titular, 2: CPF/CNPJ, 3: Data de Emissão, 4: Validade, 5: Possui Ações (Sim/Não)",
+        field_mapping={
+            "Nome do Titular": "titular",
+            "CPF/CNPJ": "cpf_cnpj",
+            "Data de Emissão": "data_emissao",
+            "Validade": "validade",
+            "Possui Ações (Sim/Não)": "possui_acoes"
+        },
+        vendedor_specific=True,
+        **kwargs
+    )
+
+
+# ============================================================================
+# RURAL CERTIDÕES (using generic processor)
+# ============================================================================
+
+async def process_certidao_itr(file_data: bytes, filename: str, session: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+    """Process ITR - Imposto Territorial Rural (property-level)"""
+    return await process_certidao_generic(
+        file_data, filename, session,
+        tipo="itr",
+        prompt="1: NIRF, 2: Área Total (hectares), 3: Último Ano Pago, 4: Débitos Pendentes (Sim/Não)",
+        field_mapping={
+            "NIRF": "nirf",
+            "Área Total (hectares)": "area_total",
+            "Último Ano Pago": "ultimo_ano_pago",
+            "Débitos Pendentes (Sim/Não)": "possui_debitos"
+        },
+        vendedor_specific=False,
+        **kwargs
+    )
+
+
+async def process_certidao_ccir(file_data: bytes, filename: str, session: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+    """Process CCIR - Certificado de Cadastro de Imóvel Rural (property-level)"""
+    return await process_certidao_generic(
+        file_data, filename, session,
+        tipo="ccir",
+        prompt="1: Código CCIR, 2: NIRF, 3: Área Total (hectares), 4: Data de Emissão, 5: Situação (Regular/Irregular)",
+        field_mapping={
+            "Código CCIR": "codigo_ccir",
+            "NIRF": "nirf",
+            "Área Total (hectares)": "area_total",
+            "Data de Emissão": "data_emissao",
+            "Situação (Regular/Irregular)": "situacao"
+        },
+        vendedor_specific=False,
+        **kwargs
+    )
+
+
+async def process_certidao_incra(file_data: bytes, filename: str, session: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+    """Process certidão negativa INCRA (property-level)"""
+    return await process_certidao_generic(
+        file_data, filename, session,
+        tipo="incra",
+        prompt="1: NIRF, 2: Data de Emissão, 3: Validade, 4: Débitos (Sim/Não)",
+        field_mapping={
+            "NIRF": "nirf",
+            "Data de Emissão": "data_emissao",
+            "Validade": "validade",
+            "Débitos (Sim/Não)": "possui_debitos"
+        },
+        vendedor_specific=False,
+        **kwargs
+    )
+
+
+async def process_certidao_ibama(file_data: bytes, filename: str, session: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+    """Process certidão negativa IBAMA (property-level)"""
+    return await process_certidao_generic(
+        file_data, filename, session,
+        tipo="ibama",
+        prompt="1: Proprietário, 2: CPF/CNPJ, 3: Data de Emissão, 4: Validade, 5: Infrações (Sim/Não)",
+        field_mapping={
+            "Proprietário": "proprietario",
+            "CPF/CNPJ": "cpf_cnpj",
+            "Data de Emissão": "data_emissao",
+            "Validade": "validade",
+            "Infrações (Sim/Não)": "possui_infracoes"
+        },
+        vendedor_specific=False,
+        **kwargs
+    )
+
+
+async def process_art_desmembramento(file_data: bytes, filename: str, session: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+    """Process ART de desmembramento (for rural desmembramento)"""
+    return await process_certidao_generic(
+        file_data, filename, session,
+        tipo="art_desmembramento",
+        prompt="1: Número ART, 2: Responsável Técnico, 3: CREA, 4: Data de Emissão, 5: Área Total Desmembrada (hectares)",
+        field_mapping={
+            "Número ART": "numero_art",
+            "Responsável Técnico": "responsavel_tecnico",
+            "CREA": "crea",
+            "Data de Emissão": "data_emissao",
+            "Área Total Desmembrada (hectares)": "area_desmembrada"
+        },
+        vendedor_specific=False,
+        **kwargs
+    )
+
+
+async def process_planta_desmembramento(file_data: bytes, filename: str, session: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+    """Process planta de desmembramento (for rural desmembramento)"""
+    vision_client = kwargs.get('vision_client')
+    gemini_model = kwargs.get('gemini_model')
+
+    # For planta, we just extract basic info
+    text = await extract_text_from_file_async(file_data, filename, vision_client)
+    prompt = "1: Área do Lote (hectares), 2: Confrontações/Divisas, 3: Número do Lote, 4: Responsável Técnico"
+    extracted = await extract_data_with_gemini_async(text, prompt, gemini_model)
+
+    certidao = {
+        "tipo": "planta_desmembramento",
+        "area_lote": extracted.get("Área do Lote (hectares)", ""),
+        "confrontacoes": extracted.get("Confrontações/Divisas", ""),
+        "numero_lote": extracted.get("Número do Lote", ""),
+        "responsavel_tecnico": extracted.get("Responsável Técnico", ""),
+        "dispensada": False
+    }
+
+    add_certidao_to_session(session, "planta_desmembramento", certidao, dispensada=False)
     return certidao
