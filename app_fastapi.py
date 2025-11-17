@@ -17,7 +17,7 @@ from routes.health_routes_fastapi import router as health_router
 from routes.auth_routes_fastapi import router as auth_router
 from routes.cartorio_routes_fastapi import router as cartorio_router
 from routes.process_routes_fastapi import router as process_router, set_clients
-from routes.process_routes_sm import router as process_sm_router
+from routes.process_routes_sm import router as process_sm_router, set_clients as set_clients_sm
 
 # Force unbuffered output
 sys.stdout = sys.__stdout__
@@ -67,6 +67,7 @@ config.initialize_gemini_client()
 
 # Set clients for process routes
 set_clients(config.get_vision_client(), config.get_gemini_model())
+set_clients_sm(config.get_vision_client(), config.get_gemini_model())
 
 # Register routers
 app.include_router(health_router)
