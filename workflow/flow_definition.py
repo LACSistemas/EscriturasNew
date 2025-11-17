@@ -455,6 +455,35 @@ def create_workflow() -> WorkflowStateMachine:
             file_description="PDF ou imagem da certidão",
             processor=document_processors.process_certidao_onus
         ),
+        next_step="check_tipo_escritura_condominio"
+    ))
+
+    # Check if Apto needs condomínio certidão
+    machine.register_step(StepDefinition(
+        name="check_tipo_escritura_condominio",
+        step_type=StepType.QUESTION,
+        handler=QuestionHandler(
+            step_name="check_tipo_escritura_condominio",
+            question="O imóvel é Apartamento (possui certidão de condomínio)?",
+            options=["Sim", "Não"],
+            save_to=None
+        ),
+        transitions=[
+            (TransitionCondition.IF_YES, "certidao_condominio_upload"),
+            (TransitionCondition.IF_NO, "valor_imovel")
+        ]
+    ))
+
+    # Certidão Condomínio (for Apto)
+    machine.register_step(StepDefinition(
+        name="certidao_condominio_upload",
+        step_type=StepType.FILE_UPLOAD,
+        handler=FileUploadHandler(
+            step_name="certidao_condominio_upload",
+            question="Faça upload da Certidão de Condomínio:",
+            file_description="PDF ou imagem da certidão",
+            processor=document_processors.process_certidao_condominio
+        ),
         next_step="valor_imovel"
     ))
 
