@@ -16,7 +16,6 @@ from database import init_database
 from routes.health_routes_fastapi import router as health_router
 from routes.auth_routes_fastapi import router as auth_router
 from routes.cartorio_routes_fastapi import router as cartorio_router
-from routes.process_routes_fastapi import router as process_router, set_clients
 from routes.process_routes_sm import router as process_sm_router, set_clients as set_clients_sm
 
 # Force unbuffered output
@@ -65,16 +64,14 @@ except Exception as e:
 config.initialize_vision_client()
 config.initialize_gemini_client()
 
-# Set clients for process routes
-set_clients(config.get_vision_client(), config.get_gemini_model())
+# Set clients for State Machine routes
 set_clients_sm(config.get_vision_client(), config.get_gemini_model())
 
 # Register routers
 app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(cartorio_router)
-app.include_router(process_router)
-app.include_router(process_sm_router)  # New State Machine endpoint
+app.include_router(process_sm_router)  # State Machine endpoint
 
 # Error handlers
 @app.exception_handler(404)
@@ -116,8 +113,13 @@ async def root():
             "Automatic API documentation",
             "Type validation with Pydantic",
             "Modern Python async/await patterns",
-            "State Machine workflow architecture (POST /process/sm)"
-        ]
+            "State Machine workflow architecture"
+        ],
+        "endpoints": {
+            "process": "POST /process/sm - Document processing with State Machine",
+            "workflow_map": "GET /workflow/map - View complete workflow",
+            "workflow_viz": "GET /workflow/visualize - ASCII visualization"
+        }
     }
 
 
