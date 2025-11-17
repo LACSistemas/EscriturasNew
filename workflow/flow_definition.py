@@ -248,8 +248,21 @@ def create_workflow() -> WorkflowStateMachine:
         ),
         transitions=[
             (TransitionCondition.IF_YES, "certidao_casamento_upload"),
-            (TransitionCondition.IF_NO, "mais_compradores")
+            (TransitionCondition.IF_NO, "comprador_certidao_nascimento_upload")
         ]
+    ))
+
+    # STEP 5a: Certidão de Nascimento do Comprador (if solteiro)
+    machine.register_step(StepDefinition(
+        name="comprador_certidao_nascimento_upload",
+        step_type=StepType.FILE_UPLOAD,
+        handler=FileUploadHandler(
+            step_name="comprador_certidao_nascimento_upload",
+            question="Faça upload da certidão de nascimento do comprador:",
+            file_description="PDF ou imagem da certidão de nascimento",
+            processor=document_processors.process_certidao_nascimento
+        ),
+        next_step="mais_compradores"
     ))
 
     # STEP 6: Certidão de Casamento Upload (if casado)
@@ -368,7 +381,7 @@ def create_workflow() -> WorkflowStateMachine:
             file_description="PDF ou imagem do CNPJ ou Contrato Social",
             processor=document_processors.process_empresa_vendedor
         ),
-        next_step="vendedor_casado"
+        next_step="certidao_negativa_federal_option"  # PJ goes directly to certidões
     ))
 
     # Vendedor Documento Upload
@@ -396,8 +409,21 @@ def create_workflow() -> WorkflowStateMachine:
         ),
         transitions=[
             (TransitionCondition.IF_YES, "vendedor_certidao_casamento_upload"),
-            (TransitionCondition.IF_NO, "certidao_negativa_federal_option")  # Updated
+            (TransitionCondition.IF_NO, "vendedor_certidao_nascimento_upload")
         ]
+    ))
+
+    # Vendedor Certidão de Nascimento (if solteiro)
+    machine.register_step(StepDefinition(
+        name="vendedor_certidao_nascimento_upload",
+        step_type=StepType.FILE_UPLOAD,
+        handler=FileUploadHandler(
+            step_name="vendedor_certidao_nascimento_upload",
+            question="Faça upload da certidão de nascimento do vendedor:",
+            file_description="PDF ou imagem da certidão de nascimento",
+            processor=document_processors.process_certidao_nascimento
+        ),
+        next_step="certidao_negativa_federal_option"
     ))
 
     # Vendedor Certidão Casamento Upload
@@ -452,8 +478,50 @@ def create_workflow() -> WorkflowStateMachine:
             file_description="PDF ou imagem do documento",
             processor=document_processors.process_vendedor_conjuge_documento
         ),
-        next_step="certidao_negativa_federal_option"  # Updated
+        next_step="certidao_conjuge_negativa_federal_option"
     ))
+
+    # =============================================================================
+    # CERTIDÕES NEGATIVAS DO CÔNJUGE DO VENDEDOR (with option workflow)
+    # =============================================================================
+
+    # Federal → Estadual → Municipal → Trabalhista → certidões do vendedor
+    create_certidao_option_workflow(
+        machine,
+        certidao_tipo="conjuge_negativa_trabalhista",
+        certidao_display_name="Certidão Negativa Trabalhista do Cônjuge",
+        processor=document_processors.process_certidao_negativa_trabalhista,
+        next_step_after="certidao_negativa_federal_option",  # Goes to vendor certidões
+        vendedor_specific=False  # Cônjuge specific
+    )
+
+    create_certidao_option_workflow(
+        machine,
+        certidao_tipo="conjuge_negativa_municipal",
+        certidao_display_name="Certidão Negativa Municipal do Cônjuge",
+        processor=document_processors.process_certidao_negativa_municipal,
+        next_step_after="certidao_conjuge_negativa_trabalhista_option",
+        vendedor_specific=False
+    )
+
+    create_certidao_option_workflow(
+        machine,
+        certidao_tipo="conjuge_negativa_estadual",
+        certidao_display_name="Certidão Negativa Estadual do Cônjuge",
+        processor=document_processors.process_certidao_negativa_estadual,
+        next_step_after="certidao_conjuge_negativa_municipal_option",
+        vendedor_specific=False
+    )
+
+    # Entry point for cônjuge certidões (from vendedor_conjuge_documento_upload)
+    create_certidao_option_workflow(
+        machine,
+        certidao_tipo="conjuge_negativa_federal",
+        certidao_display_name="Certidão Negativa Federal do Cônjuge",
+        processor=document_processors.process_certidao_negativa_federal,
+        next_step_after="certidao_conjuge_negativa_estadual_option",
+        vendedor_specific=False
+    )
 
     # =============================================================================
     # CERTIDÕES NEGATIVAS DO VENDEDOR (with option workflow)

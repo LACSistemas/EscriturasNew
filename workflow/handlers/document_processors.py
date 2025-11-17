@@ -117,6 +117,32 @@ async def process_certidao_casamento(file_data: bytes, filename: str, session: D
     return certidao_data
 
 
+async def process_certidao_nascimento(file_data: bytes, filename: str, session: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+    """Process certidão de nascimento (for solteiros)"""
+    vision_client = kwargs.get('vision_client')
+    gemini_model = kwargs.get('gemini_model')
+
+    text = await extract_text_from_file_async(file_data, filename, vision_client)
+    prompt = "1: Nome do Pai (nome completo), 2: Nome da Mãe (nome completo)"
+    extracted = await extract_data_with_gemini_async(text, prompt, gemini_model)
+    # Sanitize and validate extracted data
+    extracted = sanitize_extracted_data(extracted)
+
+    certidao_data = {
+        "nome_pai": extracted.get("Nome do Pai", ""),
+        "nome_mae": extracted.get("Nome da Mãe", "")
+    }
+
+    # Store in current comprador/vendedor
+    temp_data = ensure_temp_data(session)
+    if "current_comprador" in temp_data and temp_data["current_comprador"]:
+        temp_data["current_comprador"]["certidao_nascimento"] = certidao_data
+    elif "current_vendedor" in temp_data and temp_data["current_vendedor"]:
+        temp_data["current_vendedor"]["certidao_nascimento"] = certidao_data
+
+    return certidao_data
+
+
 async def process_documento_conjuge(file_data: bytes, filename: str, session: Dict[str, Any], **kwargs) -> Dict[str, Any]:
     """Process cônjuge document"""
     vision_client = kwargs.get('vision_client')
