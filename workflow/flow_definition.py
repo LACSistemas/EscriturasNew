@@ -511,13 +511,33 @@ def create_workflow() -> WorkflowStateMachine:
         ),
         transitions=[
             (TransitionCondition.IF_YES, "vendedor_tipo"),
-            (TransitionCondition.IF_NO, "certidao_onus_option")  # Updated
+            (TransitionCondition.IF_NO, "certidao_matricula_option")  # Start with matricula
         ]
     ))
 
     # =============================================================================
     # CERTIDÕES DO IMÓVEL (property-level, with option workflow)
     # =============================================================================
+
+    # Matrícula do Imóvel (property-level) - documento base
+    create_certidao_option_workflow(
+        machine,
+        certidao_tipo="matricula",
+        certidao_display_name="Matrícula do Imóvel",
+        processor=document_processors.process_certidao_matricula,
+        next_step_after="certidao_iptu_option",
+        vendedor_specific=False  # Property-level
+    )
+
+    # IPTU (property-level) - imposto
+    create_certidao_option_workflow(
+        machine,
+        certidao_tipo="iptu",
+        certidao_display_name="Certidão de IPTU",
+        processor=document_processors.process_certidao_iptu,
+        next_step_after="certidao_onus_option",
+        vendedor_specific=False  # Property-level
+    )
 
     # Certidão de Ônus Reais (property-level)
     create_certidao_option_workflow(
@@ -551,6 +571,16 @@ def create_workflow() -> WorkflowStateMachine:
         certidao_tipo="condominio",
         certidao_display_name="Certidão de Condomínio",
         processor=document_processors.process_certidao_condominio,
+        next_step_after="certidao_objeto_pe_option",
+        vendedor_specific=False  # Property-level
+    )
+
+    # Certidão de Objeto e Pé (for Apto) - with option workflow
+    create_certidao_option_workflow(
+        machine,
+        certidao_tipo="objeto_pe",
+        certidao_display_name="Certidão de Objeto e Pé",
+        processor=document_processors.process_certidao_objeto_pe,
         next_step_after="valor_imovel",
         vendedor_specific=False  # Property-level
     )
