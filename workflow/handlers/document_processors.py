@@ -3,6 +3,7 @@ from typing import Dict, Any
 from services.ocr_service_async import extract_text_from_file_async
 from services.ai_service_async import extract_data_with_gemini_async
 from models.session import set_current_comprador, set_current_vendedor, add_certidao_to_session, ensure_temp_data
+from utils.validators import sanitize_extracted_data
 
 
 async def process_documento_comprador(file_data: bytes, filename: str, session: Dict[str, Any], **kwargs) -> Dict[str, Any]:
@@ -26,6 +27,14 @@ async def process_documento_comprador(file_data: bytes, filename: str, session: 
 
     # Extract data with AI
     extracted = await extract_data_with_gemini_async(text, prompt, gemini_model)
+    # Sanitize and validate extracted data
+    extracted = sanitize_extracted_data(extracted)
+
+
+    # Sanitize and validate extracted data
+    extracted = sanitize_extracted_data(extracted)
+    # Sanitize and validate extracted data
+    extracted = sanitize_extracted_data(extracted)
 
     # Build comprador data
     comprador = {
@@ -60,7 +69,12 @@ async def process_empresa_comprador(file_data: bytes, filename: str, session: Di
     text = await extract_text_from_file_async(file_data, filename, vision_client)
     prompt = "1: Razão Social, 2: CNPJ, 3: Endereço completo, 4: Nome do Representante Legal"
     extracted = await extract_data_with_gemini_async(text, prompt, gemini_model)
+    # Sanitize and validate extracted data
+    extracted = sanitize_extracted_data(extracted)
 
+
+    # Sanitize and validate extracted data
+    extracted = sanitize_extracted_data(extracted)
     comprador = {
         "tipo": "Pessoa Jurídica",
         "razao_social": extracted.get("Razão Social", ""),
@@ -82,7 +96,12 @@ async def process_certidao_casamento(file_data: bytes, filename: str, session: D
     text = await extract_text_from_file_async(file_data, filename, vision_client)
     prompt = "1: Nome Completo do Cônjuge, 2: Data do Casamento, 3: Regime de Bens, 4: Cartório de Registro"
     extracted = await extract_data_with_gemini_async(text, prompt, gemini_model)
+    # Sanitize and validate extracted data
+    extracted = sanitize_extracted_data(extracted)
 
+
+    # Sanitize and validate extracted data
+    extracted = sanitize_extracted_data(extracted)
     certidao_data = {
         "nome_conjuge": extracted.get("Nome Completo do Cônjuge", ""),
         "data_casamento": extracted.get("Data do Casamento", ""),
@@ -115,7 +134,12 @@ async def process_documento_conjuge(file_data: bytes, filename: str, session: Di
         prompt = "1: Nome Completo, 2: Série da Carteira, 3: Número da Carteira, 4: Gênero"
 
     extracted = await extract_data_with_gemini_async(text, prompt, gemini_model)
+    # Sanitize and validate extracted data
+    extracted = sanitize_extracted_data(extracted)
 
+
+    # Sanitize and validate extracted data
+    extracted = sanitize_extracted_data(extracted)
     conjuge_data = {
         "nome_completo": extracted.get("Nome Completo", ""),
         "data_nascimento": extracted.get("Data de Nascimento", ""),
@@ -160,7 +184,12 @@ async def process_documento_vendedor(file_data: bytes, filename: str, session: D
         prompt = "1: Nome Completo, 2: Série da Carteira, 3: Número da Carteira, 4: Gênero"
 
     extracted = await extract_data_with_gemini_async(text, prompt, gemini_model)
+    # Sanitize and validate extracted data
+    extracted = sanitize_extracted_data(extracted)
 
+
+    # Sanitize and validate extracted data
+    extracted = sanitize_extracted_data(extracted)
     vendedor = {
         "tipo": "Pessoa Física",
         "nome_completo": extracted.get("Nome Completo", ""),
@@ -191,7 +220,12 @@ async def process_empresa_vendedor(file_data: bytes, filename: str, session: Dic
     text = await extract_text_from_file_async(file_data, filename, vision_client)
     prompt = "1: Razão Social, 2: CNPJ, 3: Endereço completo, 4: Nome do Representante Legal"
     extracted = await extract_data_with_gemini_async(text, prompt, gemini_model)
+    # Sanitize and validate extracted data
+    extracted = sanitize_extracted_data(extracted)
 
+
+    # Sanitize and validate extracted data
+    extracted = sanitize_extracted_data(extracted)
     vendedor = {
         "tipo": "Pessoa Jurídica",
         "razao_social": extracted.get("Razão Social", ""),
@@ -221,7 +255,12 @@ async def process_vendedor_conjuge_documento(file_data: bytes, filename: str, se
         prompt = "1: Nome Completo, 2: Série da Carteira, 3: Número da Carteira, 4: Gênero"
 
     extracted = await extract_data_with_gemini_async(text, prompt, gemini_model)
+    # Sanitize and validate extracted data
+    extracted = sanitize_extracted_data(extracted)
 
+
+    # Sanitize and validate extracted data
+    extracted = sanitize_extracted_data(extracted)
     conjuge_data = {
         "nome_completo": extracted.get("Nome Completo", ""),
         "data_nascimento": extracted.get("Data de Nascimento", ""),
@@ -277,6 +316,14 @@ async def process_certidao_generic(
 
     # Extract data with AI
     extracted = await extract_data_with_gemini_async(text, prompt, gemini_model)
+    # Sanitize and validate extracted data
+    extracted = sanitize_extracted_data(extracted)
+
+
+    # Sanitize and validate extracted data
+    extracted = sanitize_extracted_data(extracted)
+    # Sanitize and validate extracted data
+    extracted = sanitize_extracted_data(extracted)
 
     # Build certidao using field mapping
     certidao = {"tipo": tipo, "dispensada": False}
@@ -307,7 +354,12 @@ async def process_certidao_onus(file_data: bytes, filename: str, session: Dict[s
     text = await extract_text_from_file_async(file_data, filename, vision_client)
     prompt = "1: Data de Emissão, 2: Validade, 3: Matrícula do Imóvel, 4: Possui Ônus? (Sim/Não), 5: Descrição dos Ônus (se houver)"
     extracted = await extract_data_with_gemini_async(text, prompt, gemini_model)
+    # Sanitize and validate extracted data
+    extracted = sanitize_extracted_data(extracted)
 
+
+    # Sanitize and validate extracted data
+    extracted = sanitize_extracted_data(extracted)
     certidao = {
         "tipo": "onus",
         "data_emissao": extracted.get("Data de Emissão", ""),
@@ -330,7 +382,12 @@ async def process_certidao_negativa_federal(file_data: bytes, filename: str, ses
     text = await extract_text_from_file_async(file_data, filename, vision_client)
     prompt = "1: Nome do Titular, 2: CPF/CNPJ, 3: Data de Emissão, 4: Validade"
     extracted = await extract_data_with_gemini_async(text, prompt, gemini_model)
+    # Sanitize and validate extracted data
+    extracted = sanitize_extracted_data(extracted)
 
+
+    # Sanitize and validate extracted data
+    extracted = sanitize_extracted_data(extracted)
     temp_data = ensure_temp_data(session)
     vendedor_index = temp_data.get("current_vendedor_index", 0)
 
@@ -357,7 +414,12 @@ async def process_certidao_negativa_estadual(file_data: bytes, filename: str, se
     text = await extract_text_from_file_async(file_data, filename, vision_client)
     prompt = "1: Nome do Titular, 2: CPF/CNPJ, 3: Data de Emissão, 4: Validade"
     extracted = await extract_data_with_gemini_async(text, prompt, gemini_model)
+    # Sanitize and validate extracted data
+    extracted = sanitize_extracted_data(extracted)
 
+
+    # Sanitize and validate extracted data
+    extracted = sanitize_extracted_data(extracted)
     temp_data = ensure_temp_data(session)
     vendedor_index = temp_data.get("current_vendedor_index", 0)
 
@@ -383,7 +445,12 @@ async def process_certidao_negativa_municipal(file_data: bytes, filename: str, s
     text = await extract_text_from_file_async(file_data, filename, vision_client)
     prompt = "1: Nome do Titular, 2: CPF/CNPJ, 3: Data de Emissão, 4: Validade"
     extracted = await extract_data_with_gemini_async(text, prompt, gemini_model)
+    # Sanitize and validate extracted data
+    extracted = sanitize_extracted_data(extracted)
 
+
+    # Sanitize and validate extracted data
+    extracted = sanitize_extracted_data(extracted)
     temp_data = ensure_temp_data(session)
     vendedor_index = temp_data.get("current_vendedor_index", 0)
 
@@ -409,7 +476,12 @@ async def process_certidao_negativa_trabalhista(file_data: bytes, filename: str,
     text = await extract_text_from_file_async(file_data, filename, vision_client)
     prompt = "1: Nome do Titular, 2: CPF/CNPJ, 3: Data de Emissão, 4: Validade"
     extracted = await extract_data_with_gemini_async(text, prompt, gemini_model)
+    # Sanitize and validate extracted data
+    extracted = sanitize_extracted_data(extracted)
 
+
+    # Sanitize and validate extracted data
+    extracted = sanitize_extracted_data(extracted)
     temp_data = ensure_temp_data(session)
     vendedor_index = temp_data.get("current_vendedor_index", 0)
 
@@ -639,7 +711,12 @@ async def process_planta_desmembramento(file_data: bytes, filename: str, session
     text = await extract_text_from_file_async(file_data, filename, vision_client)
     prompt = "1: Área do Lote (hectares), 2: Confrontações/Divisas, 3: Número do Lote, 4: Responsável Técnico"
     extracted = await extract_data_with_gemini_async(text, prompt, gemini_model)
+    # Sanitize and validate extracted data
+    extracted = sanitize_extracted_data(extracted)
 
+
+    # Sanitize and validate extracted data
+    extracted = sanitize_extracted_data(extracted)
     certidao = {
         "tipo": "planta_desmembramento",
         "area_lote": extracted.get("Área do Lote (hectares)", ""),
