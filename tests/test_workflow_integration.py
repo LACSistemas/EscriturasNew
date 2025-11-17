@@ -35,29 +35,8 @@ from datetime import datetime
 sys.path.insert(0, '/home/user/EscriturasNew')
 
 from workflow.flow_definition import create_workflow
-from workflow.state_machine import WorkflowStateMachine, TransitionCondition, StepDefinition
+from workflow.state_machine import WorkflowStateMachine
 from models.session import create_new_session_dict
-
-# ============================================================================
-# MONKEY PATCH - Fix certidão options bug
-# ============================================================================
-# BUG: Certidão options are ["Apresentar", "Dispensar"] but transitions
-# expect ["Sim", "Não"]. We patch _evaluate_condition to map correctly.
-
-_original_evaluate_condition = StepDefinition._evaluate_condition
-
-def _patched_evaluate_condition(self, condition: TransitionCondition, session: Dict[str, Any], response: Optional[str]) -> bool:
-    """Patched version that maps Apresentar→Sim and Dispensar→Não"""
-    # Map certidão responses
-    if response == "Apresentar":
-        response = "Sim"
-    elif response == "Dispensar":
-        response = "Não"
-
-    return _original_evaluate_condition(self, condition, session, response)
-
-StepDefinition._evaluate_condition = _patched_evaluate_condition
-# ============================================================================
 from tests.test_dummy_data import (
     MockOCRService, MockAIService,
     generate_rg_data, generate_cnh_data, generate_ctps_data,
@@ -276,17 +255,17 @@ async def test_scenario_1_lote_simples():
     await sim.process_question_step("Não")
 
     # Step 11-22: Certidões negativas (Federal, Estadual, Municipal, Trabalhista)
-    # Each certidão has 2 steps: option + upload (if "Apresentar")
-    await sim.process_question_step("Apresentar")  # Federal option
+    # Each certidão has 2 steps: option + upload (if "Sim")
+    await sim.process_question_step("Sim")  # Federal option
     await sim.process_file_upload_step("certidao_federal", generate_certidao_negativa_data())
 
-    await sim.process_question_step("Apresentar")  # Estadual option
+    await sim.process_question_step("Sim")  # Estadual option
     await sim.process_file_upload_step("certidao_estadual", generate_certidao_negativa_data())
 
-    await sim.process_question_step("Apresentar")  # Municipal option
+    await sim.process_question_step("Sim")  # Municipal option
     await sim.process_file_upload_step("certidao_municipal", generate_certidao_negativa_data())
 
-    await sim.process_question_step("Apresentar")  # Trabalhista option
+    await sim.process_question_step("Sim")  # Trabalhista option
     await sim.process_file_upload_step("certidao_trabalhista", generate_certidao_negativa_data())
 
     # Step 19: Mais vendedores?
@@ -296,13 +275,13 @@ async def test_scenario_1_lote_simples():
     await sim.process_question_step("Não")
 
     # Step 21-26: Certidões urbanas (Matricula, IPTU, Ônus)
-    await sim.process_question_step("Apresentar")  # Matricula option
+    await sim.process_question_step("Sim")  # Matricula option
     await sim.process_file_upload_step("matricula", generate_certidao_matricula_data())
 
-    await sim.process_question_step("Apresentar")  # IPTU option
+    await sim.process_question_step("Sim")  # IPTU option
     await sim.process_file_upload_step("iptu", generate_certidao_iptu_data())
 
-    await sim.process_question_step("Apresentar")  # Ônus option
+    await sim.process_question_step("Sim")  # Ônus option
     await sim.process_file_upload_step("onus", generate_certidao_onus_data())
 
     # Step 27: É apartamento?
@@ -379,15 +358,15 @@ async def test_scenario_2_apto_complexo():
     await sim.process_question_step("Não")  # Casado (N/A para PJ, mas workflow pergunta)
 
     # Certidões negativas (Mix: apresentar, dispensar, apresentar, dispensar)
-    await sim.process_question_step("Apresentar")  # Federal
+    await sim.process_question_step("Sim")  # Federal
     await sim.process_file_upload_step("certidao_federal", generate_certidao_negativa_data())
 
-    await sim.process_question_step("Dispensar")  # Estadual
+    await sim.process_question_step("Não")  # Estadual
 
-    await sim.process_question_step("Apresentar")  # Municipal
+    await sim.process_question_step("Sim")  # Municipal
     await sim.process_file_upload_step("certidao_municipal", generate_certidao_negativa_data())
 
-    await sim.process_question_step("Dispensar")  # Trabalhista
+    await sim.process_question_step("Não")  # Trabalhista
 
     await sim.process_question_step("Não")  # Mais vendedores
 
@@ -395,23 +374,23 @@ async def test_scenario_2_apto_complexo():
     await sim.process_question_step("Não")
 
     # Certidões urbanas
-    await sim.process_question_step("Apresentar")  # Matricula
+    await sim.process_question_step("Sim")  # Matricula
     await sim.process_file_upload_step("matricula", generate_certidao_matricula_data())
 
-    await sim.process_question_step("Apresentar")  # IPTU
+    await sim.process_question_step("Sim")  # IPTU
     await sim.process_file_upload_step("iptu", generate_certidao_iptu_data())
 
-    await sim.process_question_step("Apresentar")  # Ônus
+    await sim.process_question_step("Sim")  # Ônus
     await sim.process_file_upload_step("onus", generate_certidao_onus_data())
 
     # É apartamento?
     await sim.process_question_step("Sim")
 
     # Certidões de Apto
-    await sim.process_question_step("Apresentar")  # Condomínio
+    await sim.process_question_step("Sim")  # Condomínio
     await sim.process_file_upload_step("condominio", generate_certidao_condominio_data())
 
-    await sim.process_question_step("Apresentar")  # Objeto e Pé
+    await sim.process_question_step("Sim")  # Objeto e Pé
     await sim.process_file_upload_step("objeto_pe", generate_certidao_objeto_pe_data())
 
     # Payment
@@ -477,7 +456,7 @@ async def test_scenario_3_rural_sem_desmembramento():
 
     # Certidões vendedor 1
     for cert_name in ["Federal", "Estadual", "Municipal", "Trabalhista"]:
-        await sim.process_question_step("Apresentar")
+        await sim.process_question_step("Sim")
         await sim.process_file_upload_step(f"certidao_{cert_name.lower()}", generate_certidao_negativa_data())
 
     await sim.process_question_step("Sim")  # Mais vendedores
@@ -490,7 +469,7 @@ async def test_scenario_3_rural_sem_desmembramento():
 
     # Certidões vendedor 2
     for cert_name in ["Federal", "Estadual", "Municipal", "Trabalhista"]:
-        await sim.process_question_step("Apresentar")
+        await sim.process_question_step("Sim")
         await sim.process_file_upload_step(f"certidao_{cert_name.lower()}_v2", generate_certidao_negativa_data())
 
     await sim.process_question_step("Não")  # Mais vendedores
@@ -499,16 +478,16 @@ async def test_scenario_3_rural_sem_desmembramento():
     await sim.process_question_step("Sim")
 
     # Certidões rurais (ITR, CCIR, INCRA, IBAMA)
-    await sim.process_question_step("Apresentar")  # ITR
+    await sim.process_question_step("Sim")  # ITR
     await sim.process_file_upload_step("itr", generate_certidao_itr_data())
 
-    await sim.process_question_step("Apresentar")  # CCIR
+    await sim.process_question_step("Sim")  # CCIR
     await sim.process_file_upload_step("ccir", generate_certidao_ccir_data())
 
-    await sim.process_question_step("Apresentar")  # INCRA
+    await sim.process_question_step("Sim")  # INCRA
     await sim.process_file_upload_step("incra", generate_certidao_incra_data())
 
-    await sim.process_question_step("Apresentar")  # IBAMA
+    await sim.process_question_step("Sim")  # IBAMA
     await sim.process_file_upload_step("ibama", generate_certidao_ibama_data())
 
     # Tem desmembramento?
@@ -577,7 +556,7 @@ async def test_scenario_4_rural_com_desmembramento():
 
     # Certidões vendedor
     for cert_name in ["Federal", "Estadual", "Municipal", "Trabalhista"]:
-        await sim.process_question_step("Apresentar")
+        await sim.process_question_step("Sim")
         await sim.process_file_upload_step(f"certidao_{cert_name.lower()}", generate_certidao_negativa_data())
 
     await sim.process_question_step("Não")  # Mais vendedores
@@ -586,25 +565,25 @@ async def test_scenario_4_rural_com_desmembramento():
     await sim.process_question_step("Sim")
 
     # Certidões rurais (ITR: apresentar, CCIR: apresentar, INCRA: dispensar, IBAMA: apresentar)
-    await sim.process_question_step("Apresentar")  # ITR
+    await sim.process_question_step("Sim")  # ITR
     await sim.process_file_upload_step("itr", generate_certidao_itr_data())
 
-    await sim.process_question_step("Apresentar")  # CCIR
+    await sim.process_question_step("Sim")  # CCIR
     await sim.process_file_upload_step("ccir", generate_certidao_ccir_data())
 
-    await sim.process_question_step("Dispensar")  # INCRA
+    await sim.process_question_step("Não")  # INCRA
 
-    await sim.process_question_step("Apresentar")  # IBAMA
+    await sim.process_question_step("Sim")  # IBAMA
     await sim.process_file_upload_step("ibama", generate_certidao_ibama_data())
 
     # Tem desmembramento?
     await sim.process_question_step("Sim")
 
     # Desmembramento docs
-    await sim.process_question_step("Apresentar")  # ART
+    await sim.process_question_step("Sim")  # ART
     await sim.process_file_upload_step("art_desmembramento", generate_art_desmembramento_data())
 
-    await sim.process_question_step("Apresentar")  # Planta
+    await sim.process_question_step("Sim")  # Planta
     await sim.process_file_upload_step("planta_desmembramento", generate_planta_desmembramento_data())
 
     # Payment

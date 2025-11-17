@@ -118,15 +118,15 @@ def create_certidao_option_workflow(
         step_type=StepType.QUESTION,
         handler=CallbackQuestionHandler(
             step_name=option_step_name,
-            question=f"{certidao_display_name} - Apresentar ou Dispensar?",
-            options=["Apresentar", "Dispensar"],
+            question=f"Deseja apresentar {certidao_display_name}?",
+            options=["Sim", "Não"],
             save_to=None,  # Don't save this response
-            on_yes=None,  # "Apresentar" = go to upload
-            on_no=on_dispensar  # "Dispensar" = save as dispensed
+            on_yes=None,  # "Sim" = go to upload
+            on_no=on_dispensar  # "Não" = save as dispensed
         ),
         transitions=[
-            (TransitionCondition.IF_YES, upload_step_name),  # "Apresentar" → upload
-            (TransitionCondition.IF_NO, next_step_after)      # "Dispensar" → skip to next
+            (TransitionCondition.IF_YES, upload_step_name),  # "Sim" → upload
+            (TransitionCondition.IF_NO, next_step_after)      # "Não" → skip to next
         ]
     ))
 
@@ -590,7 +590,7 @@ def create_workflow() -> WorkflowStateMachine:
             save_to=None
         ),
         transitions=[
-            (TransitionCondition.IF_YES, "art_desmembramento_option"),
+            (TransitionCondition.IF_YES, "certidao_art_desmembramento_option"),
             (TransitionCondition.IF_NO, "valor_imovel")
         ]
     ))
@@ -601,7 +601,7 @@ def create_workflow() -> WorkflowStateMachine:
         certidao_tipo="art_desmembramento",
         certidao_display_name="ART de Desmembramento",
         processor=document_processors.process_art_desmembramento,
-        next_step_after="planta_desmembramento_option",
+        next_step_after="certidao_planta_desmembramento_option",
         vendedor_specific=False  # Property-level
     )
 
