@@ -175,6 +175,14 @@ def generate_certidao_casamento_data() -> Dict[str, Any]:
     }
 
 
+def generate_certidao_nascimento_data() -> Dict[str, Any]:
+    """Generate certidão de nascimento data"""
+    return {
+        "Nome do Pai": generate_name("Masculino"),
+        "Nome da Mãe": generate_name("Feminino")
+    }
+
+
 def generate_certidao_negativa_data() -> Dict[str, Any]:
     """Generate certidão negativa (federal/estadual/municipal/trabalhista) data"""
     return {
@@ -340,6 +348,7 @@ class MockAIService:
 
         # Certidões
         "Nome Completo do Cônjuge": lambda: generate_certidao_casamento_data(),
+        "Nome do Pai": lambda: generate_certidao_nascimento_data(),  # Certidão de nascimento
         "Nome do Titular": lambda: generate_certidao_negativa_data(),
         "Matrícula do Imóvel": lambda: generate_certidao_onus_data(),
         "Número da Matrícula": lambda: generate_certidao_matricula_data(),

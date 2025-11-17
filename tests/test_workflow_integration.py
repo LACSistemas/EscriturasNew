@@ -41,6 +41,7 @@ from tests.test_dummy_data import (
     MockOCRService, MockAIService,
     generate_rg_data, generate_cnh_data, generate_ctps_data,
     generate_empresa_data, generate_certidao_casamento_data,
+    generate_certidao_nascimento_data,
     generate_certidao_negativa_data, generate_certidao_onus_data,
     generate_certidao_matricula_data, generate_certidao_iptu_data,
     generate_certidao_condominio_data, generate_certidao_objeto_pe_data,
@@ -239,22 +240,28 @@ async def test_scenario_1_lote_simples():
     # Step 5: Comprador casado?
     await sim.process_question_step("Não")
 
-    # Step 6: Mais compradores?
+    # Step 6: Comprador certidão de nascimento (solteiro)
+    await sim.process_file_upload_step("comprador_certidao_nascimento", generate_certidao_nascimento_data())
+
+    # Step 7: Mais compradores?
     await sim.process_question_step("Não")
 
-    # Step 7: Vendedor tipo
+    # Step 8: Vendedor tipo
     await sim.process_question_step("Pessoa Física")
 
-    # Step 8: Vendedor documento tipo
+    # Step 9: Vendedor documento tipo
     await sim.process_question_step("CNH")
 
-    # Step 9: Vendedor documento upload (CNH)
+    # Step 10: Vendedor documento upload (CNH)
     await sim.process_file_upload_step("vendedor_cnh", generate_cnh_data("Masculino"))
 
-    # Step 10: Vendedor casado?
+    # Step 11: Vendedor casado?
     await sim.process_question_step("Não")
 
-    # Step 11-22: Certidões negativas (Federal, Estadual, Municipal, Trabalhista)
+    # Step 12: Vendedor certidão de nascimento (solteiro)
+    await sim.process_file_upload_step("vendedor_certidao_nascimento", generate_certidao_nascimento_data())
+
+    # Step 13-20: Certidões negativas (Federal, Estadual, Municipal, Trabalhista)
     # Each certidão has 2 steps: option + upload (if "Sim")
     await sim.process_question_step("Sim")  # Federal option
     await sim.process_file_upload_step("certidao_federal", generate_certidao_negativa_data())
@@ -350,12 +357,15 @@ async def test_scenario_2_apto_complexo():
     await sim.process_file_upload_step("comprador2_cnh", generate_cnh_data("Feminino"))
     await sim.process_question_step("Não")  # Casado
 
+    # Certidão de nascimento (solteiro)
+    await sim.process_file_upload_step("comprador2_certidao_nascimento", generate_certidao_nascimento_data())
+
     await sim.process_question_step("Não")  # Mais compradores
 
     # VENDEDOR (Empresa)
     await sim.process_question_step("Pessoa Jurídica")
     await sim.process_file_upload_step("vendedor_cnpj", generate_empresa_data())
-    await sim.process_question_step("Não")  # Casado (N/A para PJ, mas workflow pergunta)
+    # PJ goes directly to certidões (no casado question or certidão nascimento)
 
     # Certidões negativas (Mix: apresentar, dispensar, apresentar, dispensar)
     await sim.process_question_step("Sim")  # Federal
@@ -454,6 +464,9 @@ async def test_scenario_3_rural_sem_desmembramento():
     await sim.process_file_upload_step("vendedor1_cnh", generate_cnh_data("Masculino"))
     await sim.process_question_step("Não")  # Casado
 
+    # Certidão de nascimento (solteiro)
+    await sim.process_file_upload_step("vendedor1_certidao_nascimento", generate_certidao_nascimento_data())
+
     # Certidões vendedor 1
     for cert_name in ["Federal", "Estadual", "Municipal", "Trabalhista"]:
         await sim.process_question_step("Sim")
@@ -466,6 +479,9 @@ async def test_scenario_3_rural_sem_desmembramento():
     await sim.process_question_step("Carteira de Identidade")
     await sim.process_file_upload_step("vendedor2_rg", generate_rg_data("Feminino"))
     await sim.process_question_step("Não")  # Casado
+
+    # Certidão de nascimento (solteiro)
+    await sim.process_file_upload_step("vendedor2_certidao_nascimento", generate_certidao_nascimento_data())
 
     # Certidões vendedor 2
     for cert_name in ["Federal", "Estadual", "Municipal", "Trabalhista"]:
@@ -540,6 +556,9 @@ async def test_scenario_4_rural_com_desmembramento():
     await sim.process_file_upload_step("comprador_cnh", generate_cnh_data("Masculino"))
     await sim.process_question_step("Não")  # Casado
 
+    # Certidão de nascimento (solteiro)
+    await sim.process_file_upload_step("comprador_certidao_nascimento", generate_certidao_nascimento_data())
+
     await sim.process_question_step("Não")  # Mais compradores
 
     # VENDEDOR (Casado com cônjuge assinando)
@@ -553,6 +572,11 @@ async def test_scenario_4_rural_com_desmembramento():
     await sim.process_question_step("Sim")  # Cônjuge assina
     await sim.process_question_step("CNH")
     await sim.process_file_upload_step("conjuge_cnh", generate_cnh_data("Feminino"))
+
+    # Certidões do cônjuge (4 certidões negativas)
+    for cert_name in ["Federal", "Estadual", "Municipal", "Trabalhista"]:
+        await sim.process_question_step("Sim")
+        await sim.process_file_upload_step(f"conjuge_certidao_{cert_name.lower()}", generate_certidao_negativa_data())
 
     # Certidões vendedor
     for cert_name in ["Federal", "Estadual", "Municipal", "Trabalhista"]:
