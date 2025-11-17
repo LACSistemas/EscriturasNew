@@ -201,3 +201,36 @@ class DynamicQuestionHandler(QuestionHandler):
             "options": self.options,
             "requires_file": False
         }
+
+
+class CallbackQuestionHandler(QuestionHandler):
+    """Handler with callback for custom logic after processing response"""
+
+    def __init__(
+        self,
+        step_name: str,
+        question: str,
+        options: List[str],
+        save_to: Optional[str] = None,
+        on_yes: Optional[callable] = None,
+        on_no: Optional[callable] = None
+    ):
+        super().__init__(step_name, question, options, save_to)
+        self.on_yes = on_yes  # Async callback if "Sim"
+        self.on_no = on_no    # Async callback if "Não"
+
+    async def process_response(
+        self,
+        session: Dict[str, Any],
+        response: Optional[str] = None,
+        **kwargs
+    ) -> None:
+        """Save response and execute callbacks"""
+        # Save response first
+        await super().process_response(session, response, **kwargs)
+
+        # Execute callback based on response
+        if response == "Sim" and self.on_yes:
+            await self.on_yes(session)
+        elif response == "Não" and self.on_no:
+            await self.on_no(session)
