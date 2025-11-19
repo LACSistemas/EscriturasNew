@@ -282,7 +282,7 @@ def render_sidebar():
     st.sidebar.markdown("### 📈 Estatísticas")
     compradores = st.session_state.session_data.get("compradores", [])
     vendedores = st.session_state.session_data.get("vendedores", [])
-    certidoes = st.session_state.session_data.get("certidoes", [])
+    certidoes = st.session_state.session_data.get("certidoes", {})
 
     col1, col2 = st.sidebar.columns(2)
     col1.metric("Compradores", len(compradores))
@@ -494,16 +494,16 @@ def render_data_view():
 
     # Tab 3: Certidões
     with tabs[2]:
-        certidoes = st.session_state.session_data.get("certidoes", [])
+        certidoes = st.session_state.session_data.get("certidoes", {})
         if certidoes:
-            for i, cert in enumerate(certidoes, 1):
+            for i, (key, cert) in enumerate(certidoes.items(), 1):
                 if isinstance(cert, dict):
-                    tipo = cert.get('tipo', 'N/A')
+                    tipo = cert.get('tipo', key)  # Use key as fallback
                     dispensada = "⏭️ Dispensada" if cert.get('dispensada', False) else "✅ Apresentada"
                     with st.expander(f"{i}. {tipo} - {dispensada}", expanded=False):
                         st.json(cert)
                 else:
-                    st.write(f"{i}. {cert}")
+                    st.write(f"{i}. {key}: {cert}")
         else:
             st.info("Nenhuma certidão registrada ainda")
 
