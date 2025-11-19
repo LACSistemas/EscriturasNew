@@ -399,8 +399,17 @@ def render_current_step():
 def render_question_step(step_def):
     """Render a question step"""
     handler = step_def.handler
-    question = handler.question if hasattr(handler, 'question') else "Pergunta não disponível"
-    options = handler.options if hasattr(handler, 'options') else []
+
+    # Check if handler has dynamic get_question method
+    if hasattr(handler, 'get_question'):
+        # Dynamic question (e.g., DynamicQuestionHandler)
+        question_data = asyncio.run(handler.get_question(st.session_state.session_data))
+        question = question_data.get('question', 'Pergunta não disponível')
+        options = question_data.get('options', [])
+    else:
+        # Static question
+        question = handler.question if hasattr(handler, 'question') else "Pergunta não disponível"
+        options = handler.options if hasattr(handler, 'options') else []
 
     st.markdown(f"**Pergunta:** {question}")
 
