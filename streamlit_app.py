@@ -9,9 +9,14 @@ import sys
 from typing import Dict, Any, List
 from datetime import datetime
 import io
+import os
+from dotenv import load_dotenv
 
 # Add project root to path
 sys.path.insert(0, '/home/user/EscriturasNew')
+
+# Load environment variables
+load_dotenv()
 
 from workflow.flow_definition import create_workflow
 from workflow.state_machine import WorkflowStateMachine, StepType
@@ -93,6 +98,39 @@ def init_session_state():
     if 'mock_ocr' not in st.session_state:
         st.session_state.mock_ocr = MockOCRService()
         st.session_state.mock_ai = MockAIService()
+        
+    # Initialize real API clients if not using dummy data
+    if 'vision_client' not in st.session_state:
+        st.session_state.vision_client = None
+        st.session_state.gemini_model = None
+        
+    if not st.session_state.use_dummy_data and st.session_state.vision_client is None:
+        init_real_apis()
+
+def init_real_apis():
+    """Initialize real Google Cloud APIs"""
+    try:
+        from google.cloud import vision
+        import google.generativeai as genai
+        
+        # Configure Google Cloud credentials
+        credentials_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
+        if credentials_path and os.path.exists(credentials_path):
+            os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credentials_path
+            st.session_state.vision_client = vision.ImageAnnotatorClient()
+        
+        # Configure Gemini
+        api_key = os.getenv('GEMINI_API_KEY')
+        model_name = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash')
+        if api_key:
+            genai.configure(api_key=api_key)
+            st.session_state.gemini_model = genai.GenerativeModel(model_name)
+            
+        return True
+        
+    except Exception as e:
+        st.error(f"❌ Erro ao inicializar APIs: {e}")
+        return False
 
 def reset_session():
     """Reset the session"""
@@ -173,13 +211,14 @@ async def process_step(response=None, file_data=None, filename=None):
                                 gemini_model=None
                             )
         else:
+            # Use real APIs if available
             await st.session_state.workflow.process_step(
                 session=st.session_state.session_data,
                 response=response,
                 file_data=file_data,
                 filename=filename,
-                vision_client=None,
-                gemini_model=None
+                vision_client=st.session_state.vision_client,
+                gemini_model=st.session_state.gemini_model
             )
 
         return True, None
@@ -204,11 +243,34 @@ def render_sidebar():
     # Dummy data toggle
     st.sidebar.markdown("---")
     st.sidebar.markdown("### ⚙️ Configurações")
+    
+    # Check if real APIs are configured
+    vision_configured = (os.getenv('GOOGLE_APPLICATION_CREDENTIALS') and 
+                        os.path.exists(os.getenv('GOOGLE_APPLICATION_CREDENTIALS', '')))
+    gemini_configured = bool(os.getenv('GEMINI_API_KEY'))
+    
+    if vision_configured and gemini_configured:
+        st.sidebar.success("✅ APIs configuradas")
+    else:
+        st.sidebar.warning("⚠️ APIs não configuradas")
+        if not vision_configured:
+            st.sidebar.text("- Vision API não configurada")
+        if not gemini_configured:
+            st.sidebar.text("- Gemini API não configurada")
+    
+    old_dummy_value = st.session_state.use_dummy_data
     st.session_state.use_dummy_data = st.sidebar.checkbox(
         "Usar Dados Dummy",
         value=st.session_state.use_dummy_data,
         help="Gera automaticamente dados de teste para uploads"
     )
+    
+    # Initialize APIs when switching from dummy to real
+    if old_dummy_value and not st.session_state.use_dummy_data:
+        if vision_configured and gemini_configured:
+            init_real_apis()
+        else:
+            st.sidebar.error("Configure as APIs primeiro!")
 
     # Reset button
     st.sidebar.markdown("---")
