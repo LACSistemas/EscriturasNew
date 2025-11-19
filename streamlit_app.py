@@ -92,6 +92,15 @@ def init_session_state():
     if 'history' not in st.session_state:
         st.session_state.history = []
 
+    if 'session_snapshots' not in st.session_state:
+        st.session_state.session_snapshots = []
+        # Save initial snapshot
+        import copy
+        st.session_state.session_snapshots.append({
+            'session_data': copy.deepcopy(st.session_state.session_data),
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        })
+
     if 'use_dummy_data' not in st.session_state:
         st.session_state.use_dummy_data = True
 
@@ -138,7 +147,38 @@ def reset_session():
     st.session_state.session_data = create_new_session_dict(session_id)
     st.session_state.session_data["current_step"] = st.session_state.workflow.initial_step
     st.session_state.history = []
+    st.session_state.session_snapshots = []
     st.rerun()
+
+def save_snapshot():
+    """Save a snapshot of current session state before processing a step"""
+    import copy
+    snapshot = {
+        'session_data': copy.deepcopy(st.session_state.session_data),
+        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    }
+    st.session_state.session_snapshots.append(snapshot)
+    # Keep only last 20 snapshots to avoid memory issues
+    if len(st.session_state.session_snapshots) > 20:
+        st.session_state.session_snapshots.pop(0)
+
+def undo_last_step():
+    """Undo the last step by restoring previous snapshot"""
+    if len(st.session_state.session_snapshots) > 0:
+        # Remove current snapshot
+        st.session_state.session_snapshots.pop()
+
+        if len(st.session_state.session_snapshots) > 0:
+            # Restore previous snapshot
+            previous_snapshot = st.session_state.session_snapshots[-1]
+            st.session_state.session_data = previous_snapshot['session_data']
+
+            # Remove last history entry
+            if st.session_state.history:
+                st.session_state.history.pop()
+
+            return True
+    return False
 
 def add_to_history(action: str, details: str):
     """Add action to history"""
@@ -182,6 +222,9 @@ def get_dummy_data_for_step(step_name: str) -> bytes:
 async def process_step(response=None, file_data=None, filename=None):
     """Process current step"""
     try:
+        # Save snapshot before processing
+        save_snapshot()
+
         if st.session_state.use_dummy_data and file_data is not None:
             # Use mock services for dummy data
             from unittest.mock import patch
@@ -238,7 +281,11 @@ def render_sidebar():
 
     # Progress
     total_steps = len(st.session_state.history)
-    st.sidebar.metric("Total de Steps", total_steps)
+    steps_can_undo = max(0, len(st.session_state.session_snapshots) - 1)
+
+    col1, col2 = st.sidebar.columns(2)
+    col1.metric("Steps Realizados", total_steps)
+    col2.metric("Pode Voltar", steps_can_undo)
 
     # Dummy data toggle
     st.sidebar.markdown("---")
@@ -272,9 +319,20 @@ def render_sidebar():
         else:
             st.sidebar.error("Configure as APIs primeiro!")
 
-    # Reset button
+    # Navigation buttons
     st.sidebar.markdown("---")
-    if st.sidebar.button("🔄 Resetar Sessão", type="primary"):
+    col1, col2 = st.sidebar.columns(2)
+
+    # Undo button
+    can_undo = len(st.session_state.session_snapshots) > 1
+    if col1.button("⬅️ Voltar", disabled=not can_undo, use_container_width=True):
+        if undo_last_step():
+            st.rerun()
+        else:
+            st.sidebar.error("Não há steps anteriores")
+
+    # Reset button
+    if col2.button("🔄 Reset", type="primary", use_container_width=True):
         reset_session()
 
     # Stats
