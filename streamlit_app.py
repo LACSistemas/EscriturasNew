@@ -331,6 +331,8 @@ def render_current_step():
         render_question_step(step_def)
     elif step_def.step_type == StepType.FILE_UPLOAD:
         render_file_upload_step(step_def)
+    elif step_def.step_type == StepType.TEXT_INPUT:
+        render_text_input_step(step_def)
     else:
         st.warning(f"Tipo de step não suportado: {step_def.step_type}")
 
@@ -430,6 +432,37 @@ def render_file_upload_step(step_def):
                     st.rerun()
                 else:
                     st.error(f"❌ Erro: {error}")
+
+def render_text_input_step(step_def):
+    """Render a text input step"""
+    handler = step_def.handler
+    question = handler.question if hasattr(handler, 'question') else "Digite sua resposta"
+    placeholder = handler.placeholder if hasattr(handler, 'placeholder') else ""
+
+    st.markdown(f"**Pergunta:** {question}")
+
+    # Text input with placeholder
+    response = st.text_input(
+        "Sua resposta:",
+        placeholder=placeholder,
+        key=f"textinput_{step_def.name}"
+    )
+
+    # Show example if placeholder exists
+    if placeholder:
+        st.markdown(f"*Exemplo: {placeholder}*")
+
+    if st.button("➡️ Enviar", key=f"btn_{step_def.name}"):
+        if response:
+            success, error = asyncio.run(process_step(response=response))
+
+            if success:
+                add_to_history(f"Text Input: {step_def.name}", f"Resposta: {response}")
+                st.rerun()
+            else:
+                st.error(f"❌ Erro: {error}")
+        else:
+            st.warning("⚠️ Por favor, insira uma resposta")
 
 def render_data_view():
     """Render collected data view"""
