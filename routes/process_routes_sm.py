@@ -5,13 +5,17 @@ Compare this with process_routes_fastapi.py to see the difference!
 """
 import uuid
 import logging
-from fastapi import APIRouter, HTTPException, Form, File, UploadFile, Request
+from fastapi import APIRouter, HTTPException, Form, File, UploadFile, Request, Depends
 from typing import Optional
 
 from config import sessions
 from workflow.flow_definition import get_workflow
 from models.session import SessionData, create_new_session_dict
 from models.schemas import StepResponse, ProcessCompleteResponse
+
+# Import auth dependencies
+from auth.dependencies import get_current_approved_user
+from models.user import User
 
 router = APIRouter(tags=["processing-sm"])
 logger = logging.getLogger(__name__)
@@ -36,10 +40,13 @@ async def process_document_sm(
     request: Request,
     session_id: Optional[str] = Form(None),
     response: Optional[str] = Form(None),
-    file: Optional[UploadFile] = File(None)
+    file: Optional[UploadFile] = File(None),
+    current_user: User = Depends(get_current_approved_user)  # 🔐 PROTEÇÃO: Apenas usuários aprovados
 ):
     """
     Document processing endpoint using State Machine
+
+    🔐 AUTENTICAÇÃO REQUERIDA: Apenas usuários aprovados podem processar documentos
 
     BENEFITS:
     - No if/elif spaghetti code ✅
@@ -47,10 +54,11 @@ async def process_document_sm(
     - Single source of truth for flow ✅
     - Easy to extend ✅
     - Self-documenting ✅
+    - Protected with auth ✅ NEW
     """
 
     try:
-        logger.info(f"DEBUG: Process request received. session_id={session_id}")
+        logger.info(f"DEBUG: Process request received. session_id={session_id}, user={current_user.email}")
 
         # =============================================================================
         # STEP 1: Get or create session
@@ -63,7 +71,15 @@ async def process_document_sm(
                 current_step=workflow.initial_step or "tipo_escritura"
             )
             # Store as dict for compatibility
-            sessions[session_id] = session_data.to_dict()
+            session_dict = session_data.to_dict()
+
+            # 🔐 Associate session with user
+            session_dict["user_id"] = current_user.id
+            session_dict["user_email"] = current_user.email
+
+            sessions[session_id] = session_dict
+
+            logger.info(f"✅ New session created: {session_id} for user {current_user.email}")
 
             # Return first question
             return await workflow.get_step_question(sessions[session_id])
@@ -74,6 +90,17 @@ async def process_document_sm(
 
         session = sessions[session_id]
 
+        # 🔐 Verify session ownership (user can only access their own sessions)
+        session_user_id = session.get("user_id")
+        if session_user_id and session_user_id != current_user.id:
+            # Admin can access any session
+            if not current_user.is_superuser:
+                logger.warning(f"❌ User {current_user.email} tried to access session {session_id} owned by user_id {session_user_id}")
+                raise HTTPException(
+                    status_code=403,
+                    detail="Você não tem permissão para acessar esta sessão"
+                )
+
         # =============================================================================
         # STEP 2: Check if we're in final processing state
         # =============================================================================
@@ -81,7 +108,9 @@ async def process_document_sm(
             # Generate escritura
             # (same processing logic as before)
             try:
-                user_id = request.session.get('user') if request.session.get('authenticated') else None
+                # Use authenticated user ID
+                user_id = current_user.id
+                logger.info(f"📄 Generating escritura for user {current_user.email} (ID: {user_id})")
 
                 # Import generators
                 from generators.escritura_generator import generate_escritura_text
