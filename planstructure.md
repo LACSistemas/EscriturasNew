@@ -380,16 +380,22 @@ BLOCOS_DISPONIVEIS = {
 
 ### 3.2. Variáveis Dinâmicas
 
+**🔗 Integração com CartorioConfig:**
+As variáveis do cartório são preenchidas automaticamente com os dados da configuração do usuário (tabela `cartorio_configs`). Isso permite que cada usuário tenha templates personalizados com suas próprias informações de cartório!
+
 ```python
 VARIAVEIS_DISPONIVEIS = {
+    # ⚡ VARIÁVEIS DO CARTÓRIO (da tabela cartorio_configs)
+    # Preenchidas automaticamente com a configuração do usuário atual
+    "NOME_CARTORIO": "Nome do cartório → cartorio_config.nome_cartorio",
+    "ENDERECO_CARTORIO": "Endereço do cartório → cartorio_config.endereco_cartorio",
+    "CIDADE_CARTORIO": "Cidade do cartório → cartorio_config.cidade_cartorio",
+    "ESTADO_CARTORIO": "Estado (UF) → cartorio_config.estado_cartorio",
+    "QUEM_ASSINA": "Quem assina → cartorio_config.quem_assina",
+
     # Data e Local
     "DATA": "Data atual da geração (ex: 22 de novembro de 2025)",
     "DATA_CURTA": "Data formato curto (ex: 22/11/2025)",
-    "CIDADE_CARTORIO": "Cidade do cartório",
-    "ESTADO_CARTORIO": "Estado do cartório (UF)",
-    "NOME_CARTORIO": "Nome completo do cartório",
-    "ENDERECO_CARTORIO": "Endereço do cartório",
-    "QUEM_ASSINA": "Nome de quem assina pelo cartório",
 
     # Vendedor (pode ter múltiplos)
     "VENDEDOR_NOME": "Nome completo do vendedor",
@@ -623,7 +629,15 @@ def render_painel_variaveis():
 - [x] Teste de criação/leitura
 
 ### FASE 2: Templates Padrão 📋
-- [ ] Criar templates padrão para cada tipo
+**📌 Fonte dos Templates:** Extrair templates dos generators atuais em `generators/`
+- `escritura_generator.py` → Template padrão para Lote/Apto
+- `escritura_rural_generator.py` → Template padrão para Rural
+- Seções em `generators/sections/` → Blocos reutilizáveis
+
+**Tarefas:**
+- [ ] Extrair templates dos generators Python para JSON
+- [ ] Converter variáveis Python (`{valor}`) para formato do editor (`[VALOR_IMOVEL]`)
+- [ ] Criar templates padrão no banco para cada tipo
 - [ ] Sistema de cópia de template padrão para usuário
 - [ ] Função de "restaurar template padrão"
 
