@@ -27,6 +27,9 @@ from workflow.flow_definition import create_workflow
 from workflow.state_machine import WorkflowStateMachine, StepType
 from models.session import create_new_session_dict
 
+# Import auth functions
+from streamlit_login import check_auth, render_login_page, render_user_info_sidebar
+
 # Import dummy data generators for testing
 from tests.test_dummy_data import (
     generate_rg_data, generate_cnh_data, generate_ctps_data,
@@ -617,6 +620,19 @@ def render_data_view():
 
 def main():
     """Main application"""
+
+    # ============================================================================
+    # 🔐 AUTENTICAÇÃO - Verificar ANTES de qualquer coisa
+    # ============================================================================
+    if not check_auth():
+        # Usuário não autenticado ou não aprovado
+        render_login_page()
+        return  # Não renderiza o resto do app
+
+    # ============================================================================
+    # ✅ Usuário autenticado e aprovado - Continuar com app normal
+    # ============================================================================
+
     # Initialize
     init_session_state()
 
@@ -624,8 +640,9 @@ def main():
     st.markdown('<div class="main-header">📝 Sistema de Escrituras</div>', unsafe_allow_html=True)
     st.markdown("### Interface Interativa para Testes do Fluxo Completo")
 
-    # Render sidebar
-    render_sidebar()
+    # Render sidebar (com info do usuário)
+    render_user_info_sidebar()  # Info do usuário no topo
+    render_sidebar()  # Sidebar normal
 
     # Main content
     col1, col2 = st.columns([2, 1])
