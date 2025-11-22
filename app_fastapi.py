@@ -10,13 +10,17 @@ from dotenv import load_dotenv
 
 # Import configuration and initialization
 from config import config, MAX_CONTENT_LENGTH
-from database import init_database
+from database import create_db_and_tables
 
 # Import FastAPI routers
 from routes.health_routes_fastapi import router as health_router
-from routes.auth_routes_fastapi import router as auth_router
+from routes.auth_routes_fastapi import router as old_auth_router  # Old auth (keep for compatibility)
 from routes.cartorio_routes_fastapi import router as cartorio_router
 from routes.process_routes_sm import router as process_sm_router, set_clients as set_clients_sm
+
+# Import FastAPI Users auth system
+from auth.users import fastapi_users, auth_backend
+from models.user_schemas import UserRead, UserCreate, UserUpdate
 
 # Force unbuffered output
 sys.stdout = sys.__stdout__
@@ -40,10 +44,14 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# Add CORS middleware
+# Add CORS middleware (para Streamlit acessar a API)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=[
+        "http://localhost:8501",  # Streamlit default port
+        "http://127.0.0.1:8501",
+        "*"  # Allow all for development (configure appropriately for production)
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -53,12 +61,7 @@ app.add_middleware(
 secret_key = os.getenv("FLASK_SECRET_KEY", "your-secret-key-here")
 app.add_middleware(SessionMiddleware, secret_key=secret_key)
 
-# Initialize database
-try:
-    init_database()
-    logger.info("Database initialized successfully")
-except Exception as e:
-    logger.error(f"Database initialization failed: {e}")
+# Note: Database tables will be created on startup event (see below)
 
 # Initialize external clients
 config.initialize_vision_client()
@@ -69,9 +72,26 @@ set_clients_sm(config.get_vision_client(), config.get_gemini_model())
 
 # Register routers
 app.include_router(health_router)
-app.include_router(auth_router)
+app.include_router(old_auth_router)  # Old auth (keep for compatibility)
 app.include_router(cartorio_router)
 app.include_router(process_sm_router)  # State Machine endpoint
+
+# FastAPI Users routers (New Auth System)
+app.include_router(
+    fastapi_users.get_auth_router(auth_backend),
+    prefix="/auth/jwt",
+    tags=["auth"]
+)
+app.include_router(
+    fastapi_users.get_register_router(UserRead, UserCreate),
+    prefix="/auth",
+    tags=["auth"]
+)
+app.include_router(
+    fastapi_users.get_users_router(UserRead, UserUpdate),
+    prefix="/users",
+    tags=["users"]
+)
 
 # Error handlers
 @app.exception_handler(404)
@@ -94,9 +114,21 @@ async def internal_error_handler(request: Request, exc):
 # Startup event
 @app.on_event("startup")
 async def startup_event():
+    # Create database tables
+    try:
+        create_db_and_tables()
+        logger.info("✅ Database tables created successfully!")
+    except Exception as e:
+        logger.error(f"❌ Database initialization failed: {e}")
+
     logger.info("🚀 FastAPI application started successfully!")
     logger.info("📚 API documentation available at /docs")
     logger.info("🔍 Alternative docs at /redoc")
+    logger.info("🔐 Auth endpoints:")
+    logger.info("   - POST /auth/register - Create new account")
+    logger.info("   - POST /auth/jwt/login - Login")
+    logger.info("   - POST /auth/jwt/logout - Logout")
+    logger.info("   - GET /users/me - Get current user")
 
 
 # Root endpoint
