@@ -18,5 +18,14 @@ PyMuPDF>=1.23.0
 # Session management
 itsdangerous==2.1.2
 
-# Database
-# (add your database dependencies here if needed)
+# Database & Authentication
+sqlalchemy==2.0.23
+alembic==1.12.1
+
+# FastAPI Users & Authentication
+fastapi-users[sqlalchemy]==12.1.2
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# Templates for Admin Panel
+jinja2==3.1.2
