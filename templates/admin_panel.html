@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel Admin - Sistema de Escrituras</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            padding: 30px;
+            background: #f8f9fa;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .stat-card h3 {
+            color: #667eea;
+            font-size: 2rem;
+            margin-bottom: 5px;
+        }
+
+        .stat-card p {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        td {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .badge-success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .badge-danger {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .badge-info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .badge-crown {
+            background: #ffd700;
+            color: #333;
+        }
+
+        button {
+            padding: 8px 15px;
+            margin: 2px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        .btn-approve {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-approve:hover {
+            background: #218838;
+        }
+
+        .btn-revoke {
+            background: #ffc107;
+            color: #333;
+        }
+
+        .btn-revoke:hover {
+            background: #e0a800;
+        }
+
+        .btn-delete {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-delete:hover {
+            background: #c82333;
+        }
+
+        .btn-toggle {
+            background: #17a2b8;
+            color: white;
+        }
+
+        .btn-toggle:hover {
+            background: #138496;
+        }
+
+        .btn-refresh {
+            background: #667eea;
+            color: white;
+            padding: 12px 30px;
+            font-size: 1rem;
+            margin-bottom: 20px;
+        }
+
+        .btn-refresh:hover {
+            background: #5568d3;
+        }
+
+        .admin-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #667eea;
+            font-size: 1.2rem;
+        }
+
+        .message {
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .footer {
+            background: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            color: #666;
+            border-top: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 Painel de Administração</h1>
+            <p>Sistema de Escrituras - Gerenciamento de Usuários</p>
+            <p style="margin-top: 10px; font-size: 0.9rem;">
+                Logado como: <strong>{{ admin.email }}</strong>
+                {% if admin.is_superuser %}
+                <span class="badge badge-crown">👑 ADMIN</span>
+                {% endif %}
+            </p>
+        </div>
+
+        <div class="stats">
+            <div class="stat-card">
+                <h3>{{ stats.total }}</h3>
+                <p>Total de Usuários</p>
+            </div>
+            <div class="stat-card">
+                <h3>{{ stats.approved }}</h3>
+                <p>Usuários Aprovados</p>
+            </div>
+            <div class="stat-card">
+                <h3>{{ stats.pending }}</h3>
+                <p>Aguardando Aprovação</p>
+            </div>
+            <div class="stat-card">
+                <h3>{{ stats.active }}</h3>
+                <p>Contas Ativas</p>
+            </div>
+        </div>
+
+        <div class="content">
+            <div id="message" class="message"></div>
+
+            <button class="btn-refresh" onclick="location.reload()">
+                🔄 Atualizar Lista
+            </button>
+
+            <h2 class="section-title">👥 Gerenciar Usuários</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Email</th>
+                        <th>Status</th>
+                        <th>Aprovação</th>
+                        <th>Tipo</th>
+                        <th>Criado em</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td><strong>#{{ user.id }}</strong></td>
+                        <td>{{ user.email }}</td>
+                        <td>
+                            {% if user.is_active %}
+                                <span class="badge badge-success">✅ Ativo</span>
+                            {% else %}
+                                <span class="badge badge-danger">❌ Inativo</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if user.is_approved %}
+                                <span class="badge badge-success">✅ Aprovado</span>
+                            {% else %}
+                                <span class="badge badge-warning">⏳ Pendente</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if user.is_superuser %}
+                                <span class="badge badge-crown">👑 Admin</span>
+                            {% else %}
+                                <span class="badge badge-info">👤 Usuário</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ user.created_at.strftime('%d/%m/%Y %H:%M') if user.created_at else 'N/A' }}</td>
+                        <td>
+                            {% if not user.is_superuser %}
+                                {% if user.is_approved %}
+                                    <button class="btn-revoke" onclick="revokeUser({{ user.id }}, '{{ user.email }}')">
+                                        ⏸️ Revogar
+                                    </button>
+                                {% else %}
+                                    <button class="btn-approve" onclick="approveUser({{ user.id }}, '{{ user.email }}')">
+                                        ✅ Aprovar
+                                    </button>
+                                {% endif %}
+
+                                <button class="btn-toggle" onclick="toggleActive({{ user.id }}, '{{ user.email }}')">
+                                    🔄 Toggle Ativo
+                                </button>
+
+                                <button class="btn-delete" onclick="deleteUser({{ user.id }}, '{{ user.email }}')">
+                                    🗑️ Deletar
+                                </button>
+                            {% else %}
+                                <span style="color: #999; font-style: italic;">Administrador</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="footer">
+            <p>Sistema de Escrituras v3.0 | Desenvolvido com FastAPI + FastAPI Users</p>
+            <p style="margin-top: 5px; font-size: 0.9rem;">
+                <a href="/docs" target="_blank" style="color: #667eea;">📚 API Docs</a> |
+                <a href="/" style="color: #667eea;">🏠 Home</a>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = window.location.origin;
+
+        function showMessage(message, type) {
+            const msgDiv = document.getElementById('message');
+            msgDiv.textContent = message;
+            msgDiv.className = `message ${type}`;
+            msgDiv.style.display = 'block';
+
+            setTimeout(() => {
+                msgDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        async function approveUser(userId, email) {
+            if (!confirm(`Aprovar usuário ${email}?\n\nIsso permitirá que ele use o sistema de escrituras.`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/admin/users/${userId}/approve`, {
+                    method: 'PATCH',
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    showMessage(data.message || `Usuário ${email} aprovado!`, 'success');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    const error = await response.json();
+                    showMessage(error.detail || 'Erro ao aprovar usuário', 'error');
+                }
+            } catch (error) {
+                showMessage('Erro de conexão: ' + error.message, 'error');
+            }
+        }
+
+        async function revokeUser(userId, email) {
+            if (!confirm(`Revogar acesso de ${email}?\n\nO usuário não poderá mais usar o sistema.`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/admin/users/${userId}/revoke`, {
+                    method: 'PATCH',
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    showMessage(data.message || `Acesso de ${email} revogado!`, 'success');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    const error = await response.json();
+                    showMessage(error.detail || 'Erro ao revogar acesso', 'error');
+                }
+            } catch (error) {
+                showMessage('Erro de conexão: ' + error.message, 'error');
+            }
+        }
+
+        async function toggleActive(userId, email) {
+            if (!confirm(`Alternar status de ${email}?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/admin/users/${userId}/toggle-active`, {
+                    method: 'PATCH',
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    showMessage(data.message || `Status de ${email} alterado!`, 'success');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    const error = await response.json();
+                    showMessage(error.detail || 'Erro ao alterar status', 'error');
+                }
+            } catch (error) {
+                showMessage('Erro de conexão: ' + error.message, 'error');
+            }
+        }
+
+        async function deleteUser(userId, email) {
+            if (!confirm(`DELETAR permanentemente ${email}?\n\n⚠️ ESTA AÇÃO NÃO PODE SER DESFEITA!`)) {
+                return;
+            }
+
+            const confirmDelete = prompt(`Digite "DELETAR" para confirmar a exclusão de ${email}:`);
+            if (confirmDelete !== 'DELETAR') {
+                showMessage('Exclusão cancelada', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/admin/users/${userId}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    showMessage(data.message || `Usuário ${email} deletado!`, 'success');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    const error = await response.json();
+                    showMessage(error.detail || 'Erro ao deletar usuário', 'error');
+                }
+            } catch (error) {
+                showMessage('Erro de conexão: ' + error.message, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

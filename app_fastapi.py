@@ -17,6 +17,7 @@ from routes.health_routes_fastapi import router as health_router
 from routes.auth_routes_fastapi import router as old_auth_router  # Old auth (keep for compatibility)
 from routes.cartorio_routes_fastapi import router as cartorio_router
 from routes.process_routes_sm import router as process_sm_router, set_clients as set_clients_sm
+from routes.admin_routes import router as admin_router  # Admin panel
 
 # Import FastAPI Users auth system
 from auth.users import fastapi_users, auth_backend
@@ -93,6 +94,9 @@ app.include_router(
     tags=["users"]
 )
 
+# Admin panel router
+app.include_router(admin_router)
+
 # Error handlers
 @app.exception_handler(404)
 async def not_found_handler(request: Request, exc):
@@ -124,11 +128,19 @@ async def startup_event():
     logger.info("🚀 FastAPI application started successfully!")
     logger.info("📚 API documentation available at /docs")
     logger.info("🔍 Alternative docs at /redoc")
+    logger.info("")
     logger.info("🔐 Auth endpoints:")
     logger.info("   - POST /auth/register - Create new account")
     logger.info("   - POST /auth/jwt/login - Login")
     logger.info("   - POST /auth/jwt/logout - Logout")
     logger.info("   - GET /users/me - Get current user")
+    logger.info("")
+    logger.info("👑 Admin panel:")
+    logger.info("   - GET /admin/panel - Admin dashboard (HTML)")
+    logger.info("   - GET /admin/users - List all users (JSON)")
+    logger.info("   - PATCH /admin/users/{id}/approve - Approve user")
+    logger.info("   - PATCH /admin/users/{id}/revoke - Revoke user access")
+    logger.info("   - DELETE /admin/users/{id} - Delete user")
 
 
 # Root endpoint
