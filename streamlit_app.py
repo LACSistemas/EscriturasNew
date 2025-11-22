@@ -27,6 +27,15 @@ from workflow.flow_definition import create_workflow
 from workflow.state_machine import WorkflowStateMachine, StepType
 from models.session import create_new_session_dict
 
+# Import auth functions
+from streamlit_login import check_auth, render_login_page, render_user_info_sidebar
+
+# Import cartorio config functions
+from streamlit_cartorio_config import (
+    render_cartorio_config_page,
+    render_cartorio_config_sidebar
+)
+
 # Import dummy data generators for testing
 from tests.test_dummy_data import (
     generate_rg_data, generate_cnh_data, generate_ctps_data,
@@ -617,39 +626,81 @@ def render_data_view():
 
 def main():
     """Main application"""
+
+    # ============================================================================
+    # 🔐 AUTENTICAÇÃO - Verificar ANTES de qualquer coisa
+    # ============================================================================
+    if not check_auth():
+        # Usuário não autenticado ou não aprovado
+        render_login_page()
+        return  # Não renderiza o resto do app
+
+    # ============================================================================
+    # ✅ Usuário autenticado e aprovado - Continuar com app normal
+    # ============================================================================
+
     # Initialize
     init_session_state()
 
-    # Header
-    st.markdown('<div class="main-header">📝 Sistema de Escrituras</div>', unsafe_allow_html=True)
-    st.markdown("### Interface Interativa para Testes do Fluxo Completo")
+    # Render user info na sidebar
+    render_user_info_sidebar()
 
-    # Render sidebar
-    render_sidebar()
+    # ============================================================================
+    # NAVEGAÇÃO ENTRE PÁGINAS
+    # ============================================================================
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 📄 Navegação")
 
-    # Main content
-    col1, col2 = st.columns([2, 1])
+    page = st.sidebar.radio(
+        "Selecione a página:",
+        ["📝 Workflow", "⚙️ Configurar Cartório"],
+        label_visibility="collapsed"
+    )
 
-    with col1:
-        # Current step
-        render_current_step()
+    # Renderizar cartorio config status na sidebar
+    render_cartorio_config_sidebar()
 
-    with col2:
-        # Quick info
-        st.markdown('<div class="info-box">', unsafe_allow_html=True)
-        st.markdown("### ℹ️ Informações")
-        st.markdown(f"""
-        - **Steps Executados:** {len(st.session_state.history)}
-        - **Compradores:** {len(st.session_state.session_data.get('compradores', []))}
-        - **Vendedores:** {len(st.session_state.session_data.get('vendedores', []))}
-        - **Certidões:** {len(st.session_state.session_data.get('certidoes', []))}
-        """)
-        st.markdown('</div>', unsafe_allow_html=True)
+    # ============================================================================
+    # RENDERIZAR PÁGINA SELECIONADA
+    # ============================================================================
 
-    # Data view
-    render_data_view()
+    if page == "⚙️ Configurar Cartório":
+        # Página de configuração de cartório
+        render_cartorio_config_page()
 
-    # Footer
+    else:  # page == "📝 Workflow"
+        # Página principal do workflow
+
+        # Header
+        st.markdown('<div class="main-header">📝 Sistema de Escrituras</div>', unsafe_allow_html=True)
+        st.markdown("### Interface Interativa para Testes do Fluxo Completo")
+
+        # Render sidebar com info da sessão
+        render_sidebar()
+
+        # Main content
+        col1, col2 = st.columns([2, 1])
+
+        with col1:
+            # Current step
+            render_current_step()
+
+        with col2:
+            # Quick info
+            st.markdown('<div class="info-box">', unsafe_allow_html=True)
+            st.markdown("### ℹ️ Informações")
+            st.markdown(f"""
+            - **Steps Executados:** {len(st.session_state.history)}
+            - **Compradores:** {len(st.session_state.session_data.get('compradores', []))}
+            - **Vendedores:** {len(st.session_state.session_data.get('vendedores', []))}
+            - **Certidões:** {len(st.session_state.session_data.get('certidoes', []))}
+            """)
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        # Data view
+        render_data_view()
+
+    # Footer (em todas as páginas)
     st.markdown("---")
     st.markdown(
         '<div style="text-align: center; color: gray; font-size: 0.9rem;">'

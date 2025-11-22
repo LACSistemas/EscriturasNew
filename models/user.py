@@ -2,10 +2,11 @@
 User model para autenticação usando FastAPI Users
 Extende SQLAlchemyBaseUserTable com campo custom is_approved
 """
+from datetime import datetime
+from typing import Optional
 from fastapi_users.db import SQLAlchemyBaseUserTable
-from sqlalchemy import Boolean, Column, String, DateTime, Integer
-from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
+from sqlalchemy import Boolean, DateTime, func
+from sqlalchemy.orm import Mapped, mapped_column
 from database import Base
 
 
@@ -24,31 +25,31 @@ class User(SQLAlchemyBaseUserTable[int], Base):
     Campo custom:
     - is_approved: Boolean se admin aprovou manualmente
     """
-    __tablename__ = "users"
+    # Define primary key for integer ID (required when using SQLAlchemyBaseUserTable[int])
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
-    # FastAPI Users já define: id, email, hashed_password, is_active, is_superuser, is_verified
-    # Precisamos apenas adicionar os campos customizados
+    # FastAPI Users já define: email, hashed_password, is_active, is_superuser, is_verified
+    # Precisamos adicionar o id e os campos customizados
 
     # ⚡ CUSTOM FIELD - Aprovação manual do admin
-    is_approved = Column(
+    is_approved: Mapped[bool] = mapped_column(
         Boolean,
         default=False,
-        nullable=False,
-        comment="Se TRUE, admin aprovou usuário manualmente para usar o sistema"
+        server_default="0",
+        nullable=False
     )
 
     # Timestamps
-    created_at = Column(
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
-        nullable=False,
-        comment="Data de criação do usuário"
+        nullable=False
     )
 
-    updated_at = Column(
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True),
         onupdate=func.now(),
-        comment="Data da última atualização"
+        nullable=True
     )
 
     # Relacionamento com sessions de workflow (será criado depois)

@@ -14,14 +14,19 @@ from database import create_db_and_tables
 
 # Import FastAPI routers
 from routes.health_routes_fastapi import router as health_router
-from routes.auth_routes_fastapi import router as old_auth_router  # Old auth (keep for compatibility)
-from routes.cartorio_routes_fastapi import router as cartorio_router
+# from routes.auth_routes_fastapi import router as old_auth_router  # Old auth (deprecated - using FastAPI Users)
+# from routes.cartorio_routes_fastapi import router as cartorio_router  # Disabled due to missing database functions
 from routes.process_routes_sm import router as process_sm_router, set_clients as set_clients_sm
 from routes.admin_routes import router as admin_router  # Admin panel
+from routes.cartorio_config_routes import router as cartorio_config_router  # Cartorio configuration
 
 # Import FastAPI Users auth system
 from auth.users import fastapi_users, auth_backend
 from models.user_schemas import UserRead, UserCreate, UserUpdate
+
+# Import models (para criar tabelas)
+from models.user import User
+from models.cartorio_config import CartorioConfig
 
 # Force unbuffered output
 sys.stdout = sys.__stdout__
@@ -73,8 +78,8 @@ set_clients_sm(config.get_vision_client(), config.get_gemini_model())
 
 # Register routers
 app.include_router(health_router)
-app.include_router(old_auth_router)  # Old auth (keep for compatibility)
-app.include_router(cartorio_router)
+# app.include_router(old_auth_router)  # Old auth (deprecated - using FastAPI Users)
+# app.include_router(cartorio_router)  # Disabled due to missing database functions
 app.include_router(process_sm_router)  # State Machine endpoint
 
 # FastAPI Users routers (New Auth System)
@@ -96,6 +101,9 @@ app.include_router(
 
 # Admin panel router
 app.include_router(admin_router)
+
+# Cartorio configuration router
+app.include_router(cartorio_config_router)
 
 # Error handlers
 @app.exception_handler(404)
