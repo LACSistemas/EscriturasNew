@@ -1,6 +1,10 @@
 """Declarative workflow definition - Single source of truth for the complete flow"""
 from workflow.state_machine import WorkflowStateMachine, StepDefinition, StepType, TransitionCondition
-from workflow.handlers.base_handlers import QuestionHandler, TextInputHandler, FileUploadHandler, DynamicQuestionHandler, CallbackQuestionHandler
+from workflow.handlers.base_handlers import (
+    QuestionHandler, TextInputHandler, FileUploadHandler,
+    DynamicQuestionHandler, CallbackQuestionHandler,
+    PersonalizedCertidaoQuestionHandler, PersonalizedCertidaoFileHandler
+)
 from workflow.handlers import document_processors
 from models.session import finalize_and_add_comprador, finalize_and_add_vendedor, ensure_temp_data
 from typing import Dict, Any
@@ -86,7 +90,8 @@ def create_certidao_option_workflow(
     certidao_display_name: str,
     processor: callable,
     next_step_after: str,
-    vendedor_specific: bool = False
+    vendedor_specific: bool = False,
+    person_type: str = None  # "vendedor" or "conjuge" for personalized certidões
 ) -> str:
     """DRY helper to create option workflow for certidões.
 
@@ -101,6 +106,7 @@ def create_certidao_option_workflow(
         processor: Async function to process file
         next_step_after: Step to go to after this certidão is done
         vendedor_specific: If True, certidão is vendedor-specific
+        person_type: If set, personalizes questions with person's name ("vendedor" or "conjuge")
 
     Returns:
         Name of the option step (to use as entry point)
@@ -113,35 +119,74 @@ def create_certidao_option_workflow(
         await dispensar_certidao(session, certidao_tipo, vendedor_specific)
 
     # STEP 1: Option question
-    machine.register_step(StepDefinition(
-        name=option_step_name,
-        step_type=StepType.QUESTION,
-        handler=CallbackQuestionHandler(
-            step_name=option_step_name,
-            question=f"Deseja apresentar {certidao_display_name}?",
-            options=["Sim", "Não"],
-            save_to=None,  # Don't save this response
-            on_yes=None,  # "Sim" = go to upload
-            on_no=on_dispensar  # "Não" = save as dispensed
-        ),
-        transitions=[
-            (TransitionCondition.IF_YES, upload_step_name),  # "Sim" → upload
-            (TransitionCondition.IF_NO, next_step_after)      # "Não" → skip to next
-        ]
-    ))
+    if person_type:
+        # Use personalized handler that includes person's name
+        machine.register_step(StepDefinition(
+            name=option_step_name,
+            step_type=StepType.QUESTION,
+            handler=PersonalizedCertidaoQuestionHandler(
+                step_name=option_step_name,
+                question_template="Deseja apresentar {certidao_name} para {person_name}?",
+                options=["Sim", "Não"],
+                certidao_display_name=certidao_display_name,
+                person_type=person_type,
+                save_to=None,
+                on_yes=None,
+                on_no=on_dispensar
+            ),
+            transitions=[
+                (TransitionCondition.IF_YES, upload_step_name),
+                (TransitionCondition.IF_NO, next_step_after)
+            ]
+        ))
+    else:
+        # Use standard handler
+        machine.register_step(StepDefinition(
+            name=option_step_name,
+            step_type=StepType.QUESTION,
+            handler=CallbackQuestionHandler(
+                step_name=option_step_name,
+                question=f"Deseja apresentar {certidao_display_name}?",
+                options=["Sim", "Não"],
+                save_to=None,
+                on_yes=None,
+                on_no=on_dispensar
+            ),
+            transitions=[
+                (TransitionCondition.IF_YES, upload_step_name),
+                (TransitionCondition.IF_NO, next_step_after)
+            ]
+        ))
 
     # STEP 2: Upload step
-    machine.register_step(StepDefinition(
-        name=upload_step_name,
-        step_type=StepType.FILE_UPLOAD,
-        handler=FileUploadHandler(
-            step_name=upload_step_name,
-            question=f"Faça upload da {certidao_display_name}:",
-            file_description="PDF ou imagem da certidão",
-            processor=processor
-        ),
-        next_step=next_step_after
-    ))
+    if person_type:
+        # Use personalized file handler
+        machine.register_step(StepDefinition(
+            name=upload_step_name,
+            step_type=StepType.FILE_UPLOAD,
+            handler=PersonalizedCertidaoFileHandler(
+                step_name=upload_step_name,
+                question_template="Faça upload da {certidao_name} para {person_name}:",
+                file_description="PDF ou imagem da certidão",
+                certidao_display_name=certidao_display_name,
+                person_type=person_type,
+                processor=processor
+            ),
+            next_step=next_step_after
+        ))
+    else:
+        # Use standard file handler
+        machine.register_step(StepDefinition(
+            name=upload_step_name,
+            step_type=StepType.FILE_UPLOAD,
+            handler=FileUploadHandler(
+                step_name=upload_step_name,
+                question=f"Faça upload da {certidao_display_name}:",
+                file_description="PDF ou imagem da certidão",
+                processor=processor
+            ),
+            next_step=next_step_after
+        ))
 
     logger.debug(f"Created certidão option workflow: {option_step_name} → {upload_step_name} → {next_step_after}")
 
@@ -489,38 +534,42 @@ def create_workflow() -> WorkflowStateMachine:
     create_certidao_option_workflow(
         machine,
         certidao_tipo="conjuge_negativa_trabalhista",
-        certidao_display_name="Certidão Negativa Trabalhista do Cônjuge",
+        certidao_display_name="Certidão Negativa Trabalhista",
         processor=document_processors.process_certidao_negativa_trabalhista,
         next_step_after="certidao_negativa_federal_option",  # Goes to vendor certidões
-        vendedor_specific=False  # Cônjuge specific
+        vendedor_specific=False,  # Cônjuge specific
+        person_type="conjuge"  # Personalizar com nome do cônjuge
     )
 
     create_certidao_option_workflow(
         machine,
         certidao_tipo="conjuge_negativa_municipal",
-        certidao_display_name="Certidão Negativa Municipal do Cônjuge",
+        certidao_display_name="Certidão Negativa Municipal",
         processor=document_processors.process_certidao_negativa_municipal,
         next_step_after="certidao_conjuge_negativa_trabalhista_option",
-        vendedor_specific=False
+        vendedor_specific=False,
+        person_type="conjuge"  # Personalizar com nome do cônjuge
     )
 
     create_certidao_option_workflow(
         machine,
         certidao_tipo="conjuge_negativa_estadual",
-        certidao_display_name="Certidão Negativa Estadual do Cônjuge",
+        certidao_display_name="Certidão Negativa Estadual",
         processor=document_processors.process_certidao_negativa_estadual,
         next_step_after="certidao_conjuge_negativa_municipal_option",
-        vendedor_specific=False
+        vendedor_specific=False,
+        person_type="conjuge"  # Personalizar com nome do cônjuge
     )
 
     # Entry point for cônjuge certidões (from vendedor_conjuge_documento_upload)
     create_certidao_option_workflow(
         machine,
         certidao_tipo="conjuge_negativa_federal",
-        certidao_display_name="Certidão Negativa Federal do Cônjuge",
+        certidao_display_name="Certidão Negativa Federal",
         processor=document_processors.process_certidao_negativa_federal,
         next_step_after="certidao_conjuge_negativa_estadual_option",
-        vendedor_specific=False
+        vendedor_specific=False,
+        person_type="conjuge"  # Personalizar com nome do cônjuge
     )
 
     # =============================================================================
@@ -534,7 +583,8 @@ def create_workflow() -> WorkflowStateMachine:
         certidao_display_name="Certidão Negativa Trabalhista",
         processor=document_processors.process_certidao_negativa_trabalhista,
         next_step_after="mais_vendedores",
-        vendedor_specific=True
+        vendedor_specific=True,
+        person_type="vendedor"  # Personalizar com nome do vendedor
     )
 
     create_certidao_option_workflow(
@@ -543,7 +593,8 @@ def create_workflow() -> WorkflowStateMachine:
         certidao_display_name="Certidão Negativa Municipal",
         processor=document_processors.process_certidao_negativa_municipal,
         next_step_after="certidao_negativa_trabalhista_option",
-        vendedor_specific=True
+        vendedor_specific=True,
+        person_type="vendedor"  # Personalizar com nome do vendedor
     )
 
     create_certidao_option_workflow(
@@ -552,7 +603,8 @@ def create_workflow() -> WorkflowStateMachine:
         certidao_display_name="Certidão Negativa Estadual",
         processor=document_processors.process_certidao_negativa_estadual,
         next_step_after="certidao_negativa_municipal_option",
-        vendedor_specific=True
+        vendedor_specific=True,
+        person_type="vendedor"  # Personalizar com nome do vendedor
     )
 
     # Entry point for vendedor certidões (from vendedor_casado or vendedor_conjuge_documento_upload)
@@ -562,7 +614,8 @@ def create_workflow() -> WorkflowStateMachine:
         certidao_display_name="Certidão Negativa Federal",
         processor=document_processors.process_certidao_negativa_federal,
         next_step_after="certidao_negativa_estadual_option",
-        vendedor_specific=True
+        vendedor_specific=True,
+        person_type="vendedor"  # Personalizar com nome do vendedor
     )
 
     # Mais Vendedores?

@@ -234,3 +234,140 @@ class CallbackQuestionHandler(QuestionHandler):
             await self.on_yes(session)
         elif response == "Não" and self.on_no:
             await self.on_no(session)
+
+
+class PersonalizedCertidaoQuestionHandler(CallbackQuestionHandler):
+    """Handler for certidão questions that include the person's name"""
+
+    def __init__(
+        self,
+        step_name: str,
+        question_template: str,  # e.g., "Deseja apresentar {certidao_name} para {person_name}?"
+        options: List[str],
+        certidao_display_name: str,
+        person_type: str,  # "vendedor" or "conjuge"
+        save_to: Optional[str] = None,
+        on_yes: Optional[callable] = None,
+        on_no: Optional[callable] = None
+    ):
+        super().__init__(step_name, question_template, options, save_to, on_yes, on_no)
+        self.question_template = question_template
+        self.certidao_display_name = certidao_display_name
+        self.person_type = person_type
+
+    async def get_question(self, session: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate question with person's name"""
+        from models.session import ensure_temp_data
+
+        person_name = "N/A"
+
+        if self.person_type == "vendedor":
+            # Get current vendedor name
+            temp_data = ensure_temp_data(session)
+            vendedor_index = temp_data.get("current_vendedor_index")
+
+            if vendedor_index is not None:
+                vendedores = session.get("vendedores", [])
+                if vendedor_index < len(vendedores):
+                    vendedor = vendedores[vendedor_index]
+                    person_name = vendedor.get("nome_completo") or vendedor.get("razao_social", "N/A")
+            else:
+                # If no vendedor finalized yet, get from temp_data
+                current_vendedor = temp_data.get("current_vendedor", {})
+                person_name = current_vendedor.get("nome_completo") or current_vendedor.get("razao_social", "N/A")
+
+        elif self.person_type == "conjuge":
+            # Get current vendedor's cônjuge name
+            temp_data = ensure_temp_data(session)
+            vendedor_index = temp_data.get("current_vendedor_index")
+
+            if vendedor_index is not None:
+                vendedores = session.get("vendedores", [])
+                if vendedor_index < len(vendedores):
+                    vendedor = vendedores[vendedor_index]
+                    conjuge = vendedor.get("conjuge", {})
+                    person_name = conjuge.get("nome_completo", "N/A")
+            else:
+                # Get from temp_data
+                current_vendedor = temp_data.get("current_vendedor", {})
+                conjuge = current_vendedor.get("conjuge", {})
+                person_name = conjuge.get("nome_completo", "N/A")
+
+        formatted_question = self.question_template.format(
+            certidao_name=self.certidao_display_name,
+            person_name=person_name
+        )
+
+        return {
+            "question": formatted_question,
+            "options": self.options,
+            "requires_file": False
+        }
+
+
+class PersonalizedCertidaoFileHandler(FileUploadHandler):
+    """Handler for certidão file uploads that include the person's name"""
+
+    def __init__(
+        self,
+        step_name: str,
+        question_template: str,  # e.g., "Faça upload da {certidao_name} para {person_name}:"
+        file_description: str,
+        certidao_display_name: str,
+        person_type: str,  # "vendedor" or "conjuge"
+        processor: Optional[callable] = None,
+        save_to: Optional[str] = None
+    ):
+        super().__init__(step_name, question_template, file_description, processor, save_to)
+        self.question_template = question_template
+        self.certidao_display_name = certidao_display_name
+        self.person_type = person_type
+
+    async def get_question(self, session: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate question with person's name"""
+        from models.session import ensure_temp_data
+
+        person_name = "N/A"
+
+        if self.person_type == "vendedor":
+            # Get current vendedor name
+            temp_data = ensure_temp_data(session)
+            vendedor_index = temp_data.get("current_vendedor_index")
+
+            if vendedor_index is not None:
+                vendedores = session.get("vendedores", [])
+                if vendedor_index < len(vendedores):
+                    vendedor = vendedores[vendedor_index]
+                    person_name = vendedor.get("nome_completo") or vendedor.get("razao_social", "N/A")
+            else:
+                # If no vendedor finalized yet, get from temp_data
+                current_vendedor = temp_data.get("current_vendedor", {})
+                person_name = current_vendedor.get("nome_completo") or current_vendedor.get("razao_social", "N/A")
+
+        elif self.person_type == "conjuge":
+            # Get current vendedor's cônjuge name
+            temp_data = ensure_temp_data(session)
+            vendedor_index = temp_data.get("current_vendedor_index")
+
+            if vendedor_index is not None:
+                vendedores = session.get("vendedores", [])
+                if vendedor_index < len(vendedores):
+                    vendedor = vendedores[vendedor_index]
+                    conjuge = vendedor.get("conjuge", {})
+                    person_name = conjuge.get("nome_completo", "N/A")
+            else:
+                # Get from temp_data
+                current_vendedor = temp_data.get("current_vendedor", {})
+                conjuge = current_vendedor.get("conjuge", {})
+                person_name = conjuge.get("nome_completo", "N/A")
+
+        formatted_question = self.question_template.format(
+            certidao_name=self.certidao_display_name,
+            person_name=person_name
+        )
+
+        return {
+            "question": formatted_question,
+            "requires_file": True,
+            "file_description": self.file_description
+        }

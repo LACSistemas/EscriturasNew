@@ -10,7 +10,12 @@ from typing import Dict, Any, List
 from datetime import datetime
 import io
 import os
+import logging
 from dotenv import load_dotenv
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Add project root to path
 sys.path.insert(0, '/home/user/EscriturasNew')
@@ -153,32 +158,59 @@ def reset_session():
 def save_snapshot():
     """Save a snapshot of current session state before processing a step"""
     import copy
+
+    # Don't create duplicate snapshot if the last one is identical (e.g., after undo)
+    if len(st.session_state.session_snapshots) > 0:
+        last_snapshot = st.session_state.session_snapshots[-1]
+        current_step = st.session_state.session_data.get("current_step")
+        last_step = last_snapshot['session_data'].get("current_step")
+
+        # If we're on the same step as the last snapshot, don't create a new one
+        if current_step == last_step:
+            logger.debug(f"Skipping duplicate snapshot for step: {current_step}")
+            return
+
     snapshot = {
         'session_data': copy.deepcopy(st.session_state.session_data),
         'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
     st.session_state.session_snapshots.append(snapshot)
+    logger.debug(f"Saved snapshot for step: {st.session_state.session_data.get('current_step')}")
+
     # Keep only last 20 snapshots to avoid memory issues
     if len(st.session_state.session_snapshots) > 20:
         st.session_state.session_snapshots.pop(0)
 
 def undo_last_step():
     """Undo the last step by restoring previous snapshot"""
-    if len(st.session_state.session_snapshots) > 0:
-        # Remove current snapshot
-        st.session_state.session_snapshots.pop()
+    import logging
+    logger = logging.getLogger(__name__)
 
-        if len(st.session_state.session_snapshots) > 0:
-            # Restore previous snapshot
-            previous_snapshot = st.session_state.session_snapshots[-1]
-            st.session_state.session_data = previous_snapshot['session_data']
+    # Need at least 2 snapshots to undo (initial + at least one step)
+    if len(st.session_state.session_snapshots) <= 1:
+        logger.debug("Cannot undo: only initial snapshot exists")
+        return False
 
-            # Remove last history entry
-            if st.session_state.history:
-                st.session_state.history.pop()
+    # Get current step before undo
+    current_step = st.session_state.session_data.get("current_step", "unknown")
 
-            return True
-    return False
+    # Remove current snapshot
+    removed_snapshot = st.session_state.session_snapshots.pop()
+    logger.debug(f"Removed snapshot for step: {removed_snapshot['session_data'].get('current_step')}")
+
+    # Restore previous snapshot
+    previous_snapshot = st.session_state.session_snapshots[-1]
+    st.session_state.session_data = previous_snapshot['session_data']
+
+    previous_step = previous_snapshot['session_data'].get("current_step", "unknown")
+    logger.info(f"Undid step: {current_step} → restored to: {previous_step}")
+
+    # Remove last history entry
+    if st.session_state.history:
+        removed_history = st.session_state.history.pop()
+        logger.debug(f"Removed history entry: {removed_history}")
+
+    return True
 
 def add_to_history(action: str, details: str):
     """Add action to history"""
