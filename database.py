@@ -6,7 +6,7 @@ import os
 from typing import AsyncGenerator
 from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.orm import declarative_base, sessionmaker, Session
+from sqlalchemy.orm import sessionmaker, Session, DeclarativeBase
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -48,8 +48,10 @@ AsyncSessionLocal = async_sessionmaker(
     expire_on_commit=False
 )
 
-# Base para models
-Base = declarative_base()
+# Base para models (SQLAlchemy 2.0 style)
+class Base(DeclarativeBase):
+    """Base class for all SQLAlchemy models"""
+    pass
 
 
 # Dependency para obter sessão síncrona (para rotas sync)
