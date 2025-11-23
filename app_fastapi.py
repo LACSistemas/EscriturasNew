@@ -21,7 +21,7 @@ from routes.admin_routes import router as admin_router  # Admin panel
 from routes.cartorio_config_routes import router as cartorio_config_router  # Cartorio configuration
 
 # Import FastAPI Users auth system
-from auth.users import fastapi_users, auth_backend
+from auth.users import fastapi_users, auth_backend_jwt, auth_backend_cookie
 from models.user_schemas import UserRead, UserCreate, UserUpdate
 
 # Import models (para criar tabelas)
@@ -83,11 +83,21 @@ app.include_router(health_router)
 app.include_router(process_sm_router)  # State Machine endpoint
 
 # FastAPI Users routers (New Auth System)
+# JWT Authentication (Bearer Token)
 app.include_router(
-    fastapi_users.get_auth_router(auth_backend),
+    fastapi_users.get_auth_router(auth_backend_jwt),
     prefix="/auth/jwt",
-    tags=["auth"]
+    tags=["auth-jwt"]
 )
+
+# Cookie Authentication (para Admin Panel HTML)
+app.include_router(
+    fastapi_users.get_auth_router(auth_backend_cookie),
+    prefix="/auth/cookie",
+    tags=["auth-cookie"]
+)
+
+# Register and User management (compartilhado)
 app.include_router(
     fastapi_users.get_register_router(UserRead, UserCreate),
     prefix="/auth",

@@ -225,6 +225,16 @@ async def toggle_active(
 # HTML PANEL - Interface Web para Administração
 # ============================================================================
 
+@router.get("/login", response_class=HTMLResponse)
+async def admin_login_page(request: Request):
+    """
+    🔐 Página de Login do Admin Panel
+
+    Renderiza formulário de login que autentica via cookies.
+    """
+    return templates.TemplateResponse("admin_login.html", {"request": request})
+
+
 @router.get("/panel", response_class=HTMLResponse)
 async def admin_panel(
     request: Request,
