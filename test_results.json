@@ -1,0 +1,159 @@
+{
+  "timestamp": "2025-11-23T03:27:35.565436",
+  "total_tests": 29,
+  "passed": 26,
+  "failed": 3,
+  "errors": [
+    "Import streamlit_templates: No module named 'streamlit'",
+    "Todas as funções da API podem ser importadas: cannot import name 'set_default_template' from 'routes.template_routes' (/home/user/EscriturasNew/routes/template_routes.py)",
+    "Import de funções Streamlit: No module named 'streamlit'"
+  ],
+  "warnings": [],
+  "details": [
+    {
+      "name": "Import modelo EscrituraTemplate",
+      "status": "✅ PASSOU",
+      "details": ""
+    },
+    {
+      "name": "Import schemas Pydantic",
+      "status": "✅ PASSOU",
+      "details": ""
+    },
+    {
+      "name": "Import routes template_routes",
+      "status": "✅ PASSOU",
+      "details": ""
+    },
+    {
+      "name": "Import streamlit_templates",
+      "status": "❌ FALHOU",
+      "details": "No module named 'streamlit'"
+    },
+    {
+      "name": "Tabela escritura_templates existe",
+      "status": "✅ PASSOU",
+      "details": ""
+    },
+    {
+      "name": "Todas as colunas esperadas existem",
+      "status": "✅ PASSOU",
+      "details": "Colunas: id, user_id, tipo_escritura, nome_template, template_json, configuracoes_json, is_default, is_active, created_at, updated_at"
+    },
+    {
+      "name": "Arquivo templates_padrao_extracted.json existe",
+      "status": "✅ PASSOU",
+      "details": ""
+    },
+    {
+      "name": "Todos os 4 tipos de templates estão presentes",
+      "status": "✅ PASSOU",
+      "details": "Tipos: lote, apto, rural, rural_desmembramento"
+    },
+    {
+      "name": "Template lote tem estrutura completa",
+      "status": "✅ PASSOU",
+      "details": "9 blocos, 19 variáveis"
+    },
+    {
+      "name": "Template apto tem estrutura completa",
+      "status": "✅ PASSOU",
+      "details": "10 blocos, 20 variáveis"
+    },
+    {
+      "name": "Template rural tem estrutura completa",
+      "status": "✅ PASSOU",
+      "details": "10 blocos, 16 variáveis"
+    },
+    {
+      "name": "Template rural_desmembramento tem estrutura completa",
+      "status": "✅ PASSOU",
+      "details": "11 blocos, 20 variáveis"
+    },
+    {
+      "name": "Script extract_templates.py - sintaxe válida",
+      "status": "✅ PASSOU",
+      "details": "Extração de templates"
+    },
+    {
+      "name": "Script populate_default_templates.py - sintaxe válida",
+      "status": "✅ PASSOU",
+      "details": "População de templates"
+    },
+    {
+      "name": "Script verify_templates.py - sintaxe válida",
+      "status": "✅ PASSOU",
+      "details": "Verificação de templates"
+    },
+    {
+      "name": "Script test_template_direct.py - sintaxe válida",
+      "status": "✅ PASSOU",
+      "details": "Teste direto do modelo"
+    },
+    {
+      "name": "Script test_template_api.py - sintaxe válida",
+      "status": "✅ PASSOU",
+      "details": "Teste da API"
+    },
+    {
+      "name": "Existem templates no banco de dados",
+      "status": "✅ PASSOU",
+      "details": "Total: 4 templates"
+    },
+    {
+      "name": "Templates do tipo 'lote' existem",
+      "status": "✅ PASSOU",
+      "details": "1 template(s)"
+    },
+    {
+      "name": "Templates do tipo 'apto' existem",
+      "status": "✅ PASSOU",
+      "details": "1 template(s)"
+    },
+    {
+      "name": "Templates do tipo 'rural' existem",
+      "status": "✅ PASSOU",
+      "details": "1 template(s)"
+    },
+    {
+      "name": "Templates do tipo 'rural_desmembramento' existem",
+      "status": "✅ PASSOU",
+      "details": "1 template(s)"
+    },
+    {
+      "name": "Templates têm estrutura JSON válida",
+      "status": "✅ PASSOU",
+      "details": "Exemplo: 3 blocos"
+    },
+    {
+      "name": "Todas as funções da API podem ser importadas",
+      "status": "❌ FALHOU",
+      "details": "cannot import name 'set_default_template' from 'routes.template_routes' (/home/user/EscriturasNew/routes/template_routes.py)"
+    },
+    {
+      "name": "Template router integrado no app_fastapi.py",
+      "status": "✅ PASSOU",
+      "details": ""
+    },
+    {
+      "name": "Página de templates integrada no Streamlit",
+      "status": "✅ PASSOU",
+      "details": ""
+    },
+    {
+      "name": "Import de funções Streamlit",
+      "status": "❌ FALHOU",
+      "details": "No module named 'streamlit'"
+    },
+    {
+      "name": "Schema TemplateBlocoFormatacao válido",
+      "status": "✅ PASSOU",
+      "details": ""
+    },
+    {
+      "name": "Schema TemplateCreate válido",
+      "status": "✅ PASSOU",
+      "details": ""
+    }
+  ]
+}
