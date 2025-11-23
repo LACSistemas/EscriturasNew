@@ -1,1 +1,4 @@
 __pycache__/
+*.log
+*.db
+*.db-journal

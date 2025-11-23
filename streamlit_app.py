@@ -36,6 +36,9 @@ from streamlit_cartorio_config import (
     render_cartorio_config_sidebar
 )
 
+# Import template editor functions
+from streamlit_templates import render_template_editor_page
+
 # Import dummy data generators for testing
 from tests.test_dummy_data import (
     generate_rg_data, generate_cnh_data, generate_ctps_data,
@@ -653,7 +656,7 @@ def main():
 
     page = st.sidebar.radio(
         "Selecione a página:",
-        ["📝 Workflow", "⚙️ Configurar Cartório"],
+        ["📝 Workflow", "⚙️ Configurar Cartório", "📄 Templates"],
         label_visibility="collapsed"
     )
 
@@ -667,6 +670,10 @@ def main():
     if page == "⚙️ Configurar Cartório":
         # Página de configuração de cartório
         render_cartorio_config_page()
+
+    elif page == "📄 Templates":
+        # Página de templates
+        render_template_editor_page()
 
     else:  # page == "📝 Workflow"
         # Página principal do workflow

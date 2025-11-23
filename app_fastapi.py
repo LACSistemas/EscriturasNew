@@ -19,6 +19,7 @@ from routes.health_routes_fastapi import router as health_router
 from routes.process_routes_sm import router as process_sm_router, set_clients as set_clients_sm
 from routes.admin_routes import router as admin_router  # Admin panel
 from routes.cartorio_config_routes import router as cartorio_config_router  # Cartorio configuration
+from routes.template_routes import router as template_router  # Template editor
 
 # Import FastAPI Users auth system
 from auth.users import fastapi_users, auth_backend_jwt, auth_backend_cookie
@@ -27,6 +28,7 @@ from models.user_schemas import UserRead, UserCreate, UserUpdate
 # Import models (para criar tabelas)
 from models.user import User
 from models.cartorio_config import CartorioConfig
+from models.escritura_template import EscrituraTemplate
 
 # Force unbuffered output
 sys.stdout = sys.__stdout__
@@ -115,6 +117,9 @@ app.include_router(admin_router)
 # Cartorio configuration router
 app.include_router(cartorio_config_router)
 
+# Template editor router
+app.include_router(template_router)
+
 # Error handlers
 @app.exception_handler(404)
 async def not_found_handler(request: Request, exc):
@@ -159,6 +164,14 @@ async def startup_event():
     logger.info("   - PATCH /admin/users/{id}/approve - Approve user")
     logger.info("   - PATCH /admin/users/{id}/revoke - Revoke user access")
     logger.info("   - DELETE /admin/users/{id} - Delete user")
+    logger.info("")
+    logger.info("📝 Template editor:")
+    logger.info("   - GET /templates - List user templates")
+    logger.info("   - POST /templates - Create new template")
+    logger.info("   - GET /templates/{id} - Get template by ID")
+    logger.info("   - PUT /templates/{id} - Update template")
+    logger.info("   - DELETE /templates/{id} - Delete template")
+    logger.info("   - POST /templates/{id}/preview - Preview template")
 
 
 # Root endpoint
