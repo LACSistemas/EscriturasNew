@@ -15,9 +15,9 @@ API_BASE_URL = "http://localhost:8000"
 
 def get_auth_headers() -> Dict[str, str]:
     """Retorna headers com token de autenticação"""
-    if 'access_token' not in st.session_state or not st.session_state.access_token:
+    if 'auth_token' not in st.session_state or not st.session_state.auth_token:
         return {}
-    return {"Authorization": f"Bearer {st.session_state.access_token}"}
+    return {"Authorization": f"Bearer {st.session_state.auth_token}"}
 
 
 def list_user_templates(tipo_filter: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -570,7 +570,7 @@ def render_template_editor_page():
     st.markdown('<div class="main-header">📝 Editor de Templates</div>', unsafe_allow_html=True)
     st.markdown("### Gerencie seus templates de escrituras")
 
-    if 'access_token' not in st.session_state or not st.session_state.access_token:
+    if 'auth_token' not in st.session_state or not st.session_state.auth_token:
         st.warning("⚠️ Você precisa estar autenticado para gerenciar templates.")
         st.info("Faça login na página principal do sistema.")
         return
