@@ -265,6 +265,32 @@ def create_workflow() -> WorkflowStateMachine:
             file_description="PDF ou imagem do documento da empresa",
             processor=document_processors.process_empresa_comprador
         ),
+        next_step="comprador_representante_doc_tipo"
+    ))
+
+    # STEP 3c: Comprador Representante Documento Tipo (for Jurídica)
+    machine.register_step(StepDefinition(
+        name="comprador_representante_doc_tipo",
+        step_type=StepType.QUESTION,
+        handler=QuestionHandler(
+            step_name="comprador_representante_doc_tipo",
+            question="Qual documento do representante legal será apresentado?",
+            options=["Carteira de Identidade", "CNH", "Carteira de Trabalho"],
+            save_to="temp_data.documento_tipo"
+        ),
+        next_step="comprador_representante_upload"
+    ))
+
+    # STEP 3d: Comprador Representante Upload (for Jurídica)
+    machine.register_step(StepDefinition(
+        name="comprador_representante_upload",
+        step_type=StepType.FILE_UPLOAD,
+        handler=FileUploadHandler(
+            step_name="comprador_representante_upload",
+            question="Faça upload do documento do representante legal:",
+            file_description="PDF ou imagem do documento selecionado",
+            processor=document_processors.process_representante_comprador
+        ),
         next_step="comprador_casado"
     ))
 
@@ -426,7 +452,33 @@ def create_workflow() -> WorkflowStateMachine:
             file_description="PDF ou imagem do CNPJ ou Contrato Social",
             processor=document_processors.process_empresa_vendedor
         ),
-        next_step="certidao_negativa_federal_option"  # PJ goes directly to certidões
+        next_step="vendedor_representante_doc_tipo"
+    ))
+
+    # Vendedor Representante Documento Tipo (for Jurídica)
+    machine.register_step(StepDefinition(
+        name="vendedor_representante_doc_tipo",
+        step_type=StepType.QUESTION,
+        handler=QuestionHandler(
+            step_name="vendedor_representante_doc_tipo",
+            question="Qual documento do representante legal será apresentado?",
+            options=["Carteira de Identidade", "CNH", "Carteira de Trabalho"],
+            save_to="temp_data.documento_tipo"
+        ),
+        next_step="vendedor_representante_upload"
+    ))
+
+    # Vendedor Representante Upload (for Jurídica)
+    machine.register_step(StepDefinition(
+        name="vendedor_representante_upload",
+        step_type=StepType.FILE_UPLOAD,
+        handler=FileUploadHandler(
+            step_name="vendedor_representante_upload",
+            question="Faça upload do documento do representante legal:",
+            file_description="PDF ou imagem do documento selecionado",
+            processor=document_processors.process_representante_vendedor
+        ),
+        next_step="vendedor_casado"
     ))
 
     # Vendedor Documento Upload

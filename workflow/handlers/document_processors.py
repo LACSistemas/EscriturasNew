@@ -62,30 +62,78 @@ async def process_documento_comprador(file_data: bytes, filename: str, session: 
 
 
 async def process_empresa_comprador(file_data: bytes, filename: str, session: Dict[str, Any], **kwargs) -> Dict[str, Any]:
-    """Process comprador empresa document (CNPJ)"""
+    """Process comprador empresa document (CNPJ) - empresa data only"""
     vision_client = kwargs.get('vision_client')
     gemini_model = kwargs.get('gemini_model')
 
     text = await extract_text_from_file_async(file_data, filename, vision_client)
-    prompt = "1: Razão Social, 2: CNPJ, 3: Endereço completo, 4: Nome do Representante Legal"
+    prompt = "1: Razão Social, 2: CNPJ, 3: Endereço completo"
     extracted = await extract_data_with_gemini_async(text, prompt, gemini_model)
-    # Sanitize and validate extracted data
-    extracted = sanitize_extracted_data(extracted)
-
 
     # Sanitize and validate extracted data
     extracted = sanitize_extracted_data(extracted)
+
     comprador = {
         "tipo": "Pessoa Jurídica",
         "razao_social": extracted.get("Razão Social", ""),
         "cnpj": extracted.get("CNPJ", ""),
-        "endereco": extracted.get("Endereço completo", ""),
-        "representante_legal": extracted.get("Nome do Representante Legal", "")
+        "endereco": extracted.get("Endereço completo", "")
     }
 
     # Store using helper
     set_current_comprador(session, comprador)
     return comprador
+
+
+async def process_representante_comprador(file_data: bytes, filename: str, session: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+    """Process legal representative document for empresa comprador"""
+    vision_client = kwargs.get('vision_client')
+    gemini_model = kwargs.get('gemini_model')
+
+    # Get document type from temp_data
+    temp_data = ensure_temp_data(session)
+    doc_type = temp_data.get("documento_tipo", "Carteira de Identidade")
+
+    # Extract text from document
+    text = await extract_text_from_file_async(file_data, filename, vision_client)
+
+    # Dynamic prompt based on document type
+    if doc_type == "Carteira de Identidade":
+        prompt = "1: Nome Completo, 2: Número do CPF, 3: Data de Nascimento, 4: Gênero (analise o primeiro nome e determine se é tipicamente Masculino ou Feminino baseado em nomes brasileiros típicos. Considere nomes como João, Carlos, Pedro, Lucas, Rafael = Masculino; Maria, Ana, Carla, Cecilia, Fernanda = Feminino. Se incerto, use Masculino)"
+    elif doc_type == "CNH":
+        prompt = "1: Nome Completo, 2: Número da CNH, 3: Órgão de Expedição da CNH, 4: Data de Nascimento, 5: Gênero (analise o primeiro nome e determine se é tipicamente Masculino ou Feminino baseado em nomes brasileiros típicos. Considere nomes como João, Carlos, Pedro, Lucas, Rafael = Masculino; Maria, Ana, Carla, Cecilia, Fernanda = Feminino. Se incerto, use Masculino)"
+    else:  # Carteira de Trabalho
+        prompt = "1: Nome Completo, 2: Série da Carteira, 3: Número da Carteira, 4: Gênero (analise o primeiro nome e determine se é tipicamente Masculino ou Feminino baseado em nomes brasileiros típicos. Considere nomes como João, Carlos, Pedro, Lucas, Rafael = Masculino; Maria, Ana, Carla, Cecilia, Fernanda = Feminino. Se incerto, use Masculino)"
+
+    # Extract data with AI
+    extracted = await extract_data_with_gemini_async(text, prompt, gemini_model)
+    extracted = sanitize_extracted_data(extracted)
+
+    # Get current comprador (empresa) data
+    current_comprador = get_current_comprador(session)
+
+    # Add representative data to comprador
+    representante_data = {
+        "nome_completo": extracted.get("Nome Completo", ""),
+        "data_nascimento": extracted.get("Data de Nascimento", ""),
+        "documento_tipo": doc_type,
+        "sexo": extracted.get("Gênero", "")
+    }
+
+    if doc_type == "Carteira de Identidade":
+        representante_data["cpf"] = extracted.get("Número do CPF", "")
+    elif doc_type == "CNH":
+        representante_data["cnh_numero"] = extracted.get("Número da CNH", "")
+        representante_data["cnh_orgao_expedidor"] = extracted.get("Órgão de Expedição da CNH", "")
+    else:  # CTPS
+        representante_data["ctps_serie"] = extracted.get("Série da Carteira", "")
+        representante_data["ctps_numero"] = extracted.get("Número da Carteira", "")
+
+    # Add representante to empresa data
+    current_comprador["representante_legal"] = representante_data
+    set_current_comprador(session, current_comprador)
+
+    return representante_data
 
 
 async def process_certidao_casamento(file_data: bytes, filename: str, session: Dict[str, Any], **kwargs) -> Dict[str, Any]:
@@ -239,30 +287,78 @@ async def process_documento_vendedor(file_data: bytes, filename: str, session: D
 
 
 async def process_empresa_vendedor(file_data: bytes, filename: str, session: Dict[str, Any], **kwargs) -> Dict[str, Any]:
-    """Process vendedor empresa document"""
+    """Process vendedor empresa document - empresa data only"""
     vision_client = kwargs.get('vision_client')
     gemini_model = kwargs.get('gemini_model')
 
     text = await extract_text_from_file_async(file_data, filename, vision_client)
-    prompt = "1: Razão Social, 2: CNPJ, 3: Endereço completo, 4: Nome do Representante Legal"
+    prompt = "1: Razão Social, 2: CNPJ, 3: Endereço completo"
     extracted = await extract_data_with_gemini_async(text, prompt, gemini_model)
-    # Sanitize and validate extracted data
-    extracted = sanitize_extracted_data(extracted)
-
 
     # Sanitize and validate extracted data
     extracted = sanitize_extracted_data(extracted)
+
     vendedor = {
         "tipo": "Pessoa Jurídica",
         "razao_social": extracted.get("Razão Social", ""),
         "cnpj": extracted.get("CNPJ", ""),
-        "endereco": extracted.get("Endereço completo", ""),
-        "representante_legal": extracted.get("Nome do Representante Legal", "")
+        "endereco": extracted.get("Endereço completo", "")
     }
 
     # Store using helper
     set_current_vendedor(session, vendedor)
     return vendedor
+
+
+async def process_representante_vendedor(file_data: bytes, filename: str, session: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+    """Process legal representative document for empresa vendedor"""
+    vision_client = kwargs.get('vision_client')
+    gemini_model = kwargs.get('gemini_model')
+
+    # Get document type from temp_data
+    temp_data = ensure_temp_data(session)
+    doc_type = temp_data.get("documento_tipo", "Carteira de Identidade")
+
+    # Extract text from document
+    text = await extract_text_from_file_async(file_data, filename, vision_client)
+
+    # Dynamic prompt based on document type
+    if doc_type == "Carteira de Identidade":
+        prompt = "1: Nome Completo, 2: Número do CPF, 3: Data de Nascimento, 4: Gênero (analise o primeiro nome e determine se é tipicamente Masculino ou Feminino baseado em nomes brasileiros típicos. Considere nomes como João, Carlos, Pedro, Lucas, Rafael = Masculino; Maria, Ana, Carla, Cecilia, Fernanda = Feminino. Se incerto, use Masculino)"
+    elif doc_type == "CNH":
+        prompt = "1: Nome Completo, 2: Número da CNH, 3: Órgão de Expedição da CNH, 4: Data de Nascimento, 5: Gênero (analise o primeiro nome e determine se é tipicamente Masculino ou Feminino baseado em nomes brasileiros típicos. Considere nomes como João, Carlos, Pedro, Lucas, Rafael = Masculino; Maria, Ana, Carla, Cecilia, Fernanda = Feminino. Se incerto, use Masculino)"
+    else:  # Carteira de Trabalho
+        prompt = "1: Nome Completo, 2: Série da Carteira, 3: Número da Carteira, 4: Gênero (analise o primeiro nome e determine se é tipicamente Masculino ou Feminino baseado em nomes brasileiros típicos. Considere nomes como João, Carlos, Pedro, Lucas, Rafael = Masculino; Maria, Ana, Carla, Cecilia, Fernanda = Feminino. Se incerto, use Masculino)"
+
+    # Extract data with AI
+    extracted = await extract_data_with_gemini_async(text, prompt, gemini_model)
+    extracted = sanitize_extracted_data(extracted)
+
+    # Get current vendedor (empresa) data
+    current_vendedor = get_current_vendedor(session)
+
+    # Add representative data to vendedor
+    representante_data = {
+        "nome_completo": extracted.get("Nome Completo", ""),
+        "data_nascimento": extracted.get("Data de Nascimento", ""),
+        "documento_tipo": doc_type,
+        "sexo": extracted.get("Gênero", "")
+    }
+
+    if doc_type == "Carteira de Identidade":
+        representante_data["cpf"] = extracted.get("Número do CPF", "")
+    elif doc_type == "CNH":
+        representante_data["cnh_numero"] = extracted.get("Número da CNH", "")
+        representante_data["cnh_orgao_expedidor"] = extracted.get("Órgão de Expedição da CNH", "")
+    else:  # CTPS
+        representante_data["ctps_serie"] = extracted.get("Série da Carteira", "")
+        representante_data["ctps_numero"] = extracted.get("Número da Carteira", "")
+
+    # Add representante to empresa data
+    current_vendedor["representante_legal"] = representante_data
+    set_current_vendedor(session, current_vendedor)
+
+    return representante_data
 
 
 async def process_vendedor_conjuge_documento(file_data: bytes, filename: str, session: Dict[str, Any], **kwargs) -> Dict[str, Any]:
