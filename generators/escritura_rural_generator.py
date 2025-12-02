@@ -92,8 +92,7 @@ def generate_escritura_rural_text(session: Dict[str, Any], user_id=None) -> str:
 
     # Payment terms
     valor = session.get("valor", "R$ 100.000,00")
-    forma = session.get("forma_pagamento", "À vista")
-    meio = session.get("meio_pagamento", "transferência bancária")
+    descricao_pagamento = session.get("descricao_pagamento", "À vista via transferência bancária/PIX")
 
     payment_section = f"""1.2 - e achando-se contratado, com os Outorgados Compradores, por bem desta escritura, e na melhor forma de direito para lhe vender, como de fato vendido tem o imóvel descrito pelo preço certo e ajustado de direito por {valor} ({spell_out_currency(valor)}), pago em espécie na data de hoje, aqui; importância essa que o Outorgante Vendedor confessa e declara haver recebido em moeda corrente, pelo que se dá por pago e satisfeito, e por isso dá plena, geral e irrevogável quitação deste pagamento para nunca mais o repetirem, desde já transferindo-lhes toda a posse, domínio, direito e ação que exercia sobre o imóvel ora vendido, respondendo pela evicção de direito, quando chamados à autoria."""
 

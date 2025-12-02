@@ -871,29 +871,17 @@ def create_workflow() -> WorkflowStateMachine:
             save_to="valor",
             placeholder="R$ 0,00"
         ),
-        next_step="forma_pagamento"
+        next_step="descricao_pagamento"
     ))
 
     machine.register_step(StepDefinition(
-        name="forma_pagamento",
-        step_type=StepType.QUESTION,
-        handler=QuestionHandler(
-            step_name="forma_pagamento",
-            question="Forma de pagamento:",
-            options=["À VISTA", "ANTERIORMENTE"],
-            save_to="forma_pagamento"
-        ),
-        next_step="meio_pagamento"
-    ))
-
-    machine.register_step(StepDefinition(
-        name="meio_pagamento",
-        step_type=StepType.QUESTION,
-        handler=QuestionHandler(
-            step_name="meio_pagamento",
-            question="Meio de pagamento:",
-            options=["transferência bancária/pix", "dinheiro", "cheque"],
-            save_to="meio_pagamento"
+        name="descricao_pagamento",
+        step_type=StepType.TEXT_INPUT,
+        handler=TextInputHandler(
+            step_name="descricao_pagamento",
+            question="Descreva a forma de pagamento (ex: À vista via PIX, 50% à vista e 50% parcelado, etc):",
+            save_to="descricao_pagamento",
+            placeholder="Digite a forma de pagamento..."
         ),
         next_step="processing"
     ))
