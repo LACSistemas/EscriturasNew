@@ -218,7 +218,7 @@ def create_workflow() -> WorkflowStateMachine:
             ],
             save_to="tipo_escritura"
         ),
-        next_step="comprador_tipo"  # Always goes to comprador_tipo
+        next_step="vendedor_tipo"  # Always goes to vendedor_tipo (VENDEDORES PRIMEIRO)
     ))
 
     # =============================================================================
@@ -405,7 +405,7 @@ def create_workflow() -> WorkflowStateMachine:
         ),
         transitions=[
             (TransitionCondition.IF_YES, "comprador_tipo"),  # Loop back
-            (TransitionCondition.IF_NO, "vendedor_tipo")     # Move to vendedores
+            (TransitionCondition.IF_NO, "check_tipo_escritura_certidoes")  # Move to certidões (depois de vendedores)
         ]
     ))
 
@@ -684,7 +684,7 @@ def create_workflow() -> WorkflowStateMachine:
         ),
         transitions=[
             (TransitionCondition.IF_YES, "vendedor_tipo"),
-            (TransitionCondition.IF_NO, "check_tipo_escritura_certidoes")  # Check urban vs rural
+            (TransitionCondition.IF_NO, "comprador_tipo")  # Move to compradores (vendedores foram primeiro)
         ]
     ))
 
