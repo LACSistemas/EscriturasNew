@@ -2,7 +2,7 @@
 from typing import Dict, Any
 from services.ocr_service_async import extract_text_from_file_async
 from services.ai_service_async import extract_data_with_gemini_async
-from models.session import set_current_comprador, set_current_vendedor, add_certidao_to_session, ensure_temp_data
+from models.session import set_current_comprador, set_current_vendedor, get_current_comprador, get_current_vendedor, add_certidao_to_session, ensure_temp_data
 from utils.validators import sanitize_extracted_data
 
 
